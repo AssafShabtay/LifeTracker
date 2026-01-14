@@ -2,10 +2,12 @@ package com.example.myapplication
 
 import androidx.room.*
 import android.content.Context
+import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.RoomDatabase
 import java.util.Date
-
+import androidx.room.TypeConverters
+import com.example.myapplication.helpers.Converters
 
 // Room Database
 @Database(
@@ -13,10 +15,10 @@ import java.util.Date
         StillLocation::class,
         MovementActivity::class,
     ],
-    version = 1, // Incremented for new tables
+    version = 2,
     exportSchema = false
 )
-
+@TypeConverters(Converters::class)
 abstract class ActivityDatabase : RoomDatabase() {
     abstract fun activityDao(): ActivityDao
     companion object {
@@ -45,8 +47,8 @@ data class StillLocation(
     val id: Long = 0,
     val latitude: Double?,
     val longitude: Double?,
-    val startTimeDate: Date?,
-    val endTimeDate: Date? =null,
+    val startTimeDate: Date,
+    val endTimeDate: Date? = null,
     val wasSupposedToBeActivity: String? = null, // If this was detected during a movement activity
     val placeId: String? = null,
     val placeName: String? = null,
@@ -63,7 +65,7 @@ data class MovementActivity(
     val startLongitude: Double?,
     val endLatitude: Double? = null,
     val endLongitude: Double? = null,
-    val startTimeDate: Date?,
+    val startTimeDate: Date,
     val endTimeDate : Date? = null,
 )
 
@@ -110,8 +112,25 @@ interface ActivityDao {
         id: Long,
         endTimeDate: Date
     )
+    @Query("""
+    SELECT * FROM still_locations
+    WHERE (startTimeDate BETWEEN :start AND :end)
+       OR (endTimeDate BETWEEN :start AND :end)
+""")
+    suspend fun getStillForDay(start: Date, end: Date): List<StillLocation>
 
+    @Query("""
+    SELECT * FROM movement_activities
+    WHERE (startTimeDate BETWEEN :start AND :end)
+       OR (endTimeDate BETWEEN :start AND :end)
+""")
+    suspend fun getMovementForDay(start: Date, end: Date): List<MovementActivity>
 
+    @Transaction
+    suspend fun replaceStillWithMovement(id: Long, movement: MovementActivity) {
+        deleteStillLocation(id)
+        insertMovementActivity(movement)
+    }
 
 }
 

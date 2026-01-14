@@ -19,9 +19,7 @@
             const val EXTRA_TRANSITION_TYPE = "transition_type"
         }
 
-        class LocationService : Service() {
-            override fun onBind(intent: Intent?): IBinder? = null
-        }
+
 
         override fun onReceive(context: Context, intent: Intent) {
             val result = ActivityTransitionResult.extractResult(intent) ?: return
@@ -46,7 +44,7 @@
         }
 
         private fun notifyLocationService(context: Context, event: ActivityTransitionEvent, activityType: Int) {
-            //Notification
+
             val serviceIntent = Intent(context, LocationService::class.java).apply {
                 action = ACTION_ACTIVITY_UPDATE
                 putExtra(EXTRA_ACTIVITY_TYPE, activityType)

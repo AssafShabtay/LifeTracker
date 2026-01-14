@@ -6,6 +6,7 @@ import android.content.Intent
 import android.location.Location
 import android.os.IBinder
 import android.util.Log
+import androidx.room.Transaction
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -28,6 +29,10 @@ class LocationService : Service() {
     private var currentLocation: Location? = null
     private lateinit var dao: ActivityDao
     private var currentTrackingId: Long? = null
+    /**
+     * Service-scoped coroutines.
+     * SupervisorJob prevents one failure from cancelling all work.
+     */
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 
@@ -35,11 +40,8 @@ class LocationService : Service() {
         const val NOTIFICATION_ID = 101
         const val CHANNEL_ID = "LocationServiceChannel"
         const val TAG = "LocationService"
-        const val ACTION_ACTIVITY_UPDATE_UI = "com.example.myapplication.ACTIVITY_UPDATE_UI"
-        const val EXTRA_ACTIVITY_TYPE = "activity_type"
-        const val EXTRA_TRANSITION_TYPE = "transition_type"
-        const val EXTRA_ACTIVITY_NAME = "extra_activity_name"
-        // Activity types that involve movement
+
+        // Activity types that involve movement, used to check if an activity is a movement activity
         val MOVEMENT_ACTIVITIES = setOf(
             DetectedActivity.IN_VEHICLE,
             DetectedActivity.RUNNING,
@@ -51,8 +53,7 @@ class LocationService : Service() {
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        val db = ActivityDatabase.getDatabase(applicationContext)
-        dao = db.activityDao()
+        dao = ActivityDatabase.getDatabase(applicationContext).activityDao()
         Log.d(TAG, "Service created")
 
     }
@@ -73,7 +74,7 @@ class LocationService : Service() {
         }
         return START_STICKY
     }
-
+    // updates current Activity and then start and DB record if it's enter, otherwise closes db activity
     private suspend fun handleActivityUpdate(activityType: Int, transitionType: Int) {
 
         val enteringActivity = transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER
@@ -113,6 +114,10 @@ class LocationService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /**
+     * One-shot location fetch.
+     * Uses balanced accuracy to limit battery drain.
+     */
     private suspend fun getLocationOnce(): Location? =
         suspendCancellableCoroutine { cont ->
             try {
@@ -124,7 +129,8 @@ class LocationService : Service() {
                     .addOnSuccessListener { loc ->
                         if (!cont.isCompleted) cont.resume(loc) {}
                     }
-                    .addOnFailureListener {
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "getCurrentLocation failed", e)
                         if (!cont.isCompleted) cont.resume(null) {}
                     }
             } catch (e: Exception) {
@@ -149,45 +155,53 @@ class LocationService : Service() {
             startTimeDate = Date(),
 
         )
-        currentTrackingId = dao.insertStillLocation(stillLocation)
+        try {
+            currentTrackingId = dao.insertStillLocation(stillLocation)
+        }
+        catch (e: Exception) {
+            Log.e(TAG, "Failed to insert start still location into database and update current location", e)
+            currentTrackingId = null
+        }
     }
+
+
+
     private suspend fun endStillTracking() {
-        currentLocation = getLocationOnce()
+        currentLocation = getLocationOnce() // Ending location
         val id = currentTrackingId ?: return
-        val still = dao.getStillLocationById(id)
-        val startLatitude = still?.latitude
-        val startLongitude = still?.longitude
-        val startTime = still?.startTimeDate
+        val still = dao.getStillLocationById(id) ?: run {
+            Log.e(TAG, "StillLocation missing for id=$id")
+            currentTrackingId = null
+            return
+        }
+
+        val startLatitude = still.latitude
+        val startLongitude = still.longitude
+        val startTime = still.startTimeDate
         val endTime = Date()
         if (startLatitude != null && startLongitude != null && currentLocation?.latitude != null && currentLocation?.longitude != null) {
 
-
-            val distanceMeters = distanceInMeters(
-                startLatitude,
-                startLongitude,
-                currentLocation!!.latitude,
-                currentLocation!!.longitude
+            val resolvedActivityType = checkIfStillIsMovement(
+                startLatitude = startLatitude,
+                startLongitude = startLongitude,
+                endTime =endTime,
+                startTime= startTime,
+                endLatitude = currentLocation!!.latitude,
+                endLongitude = currentLocation!!.longitude
             )
 
-            val durationMillis = endTime.time - (startTime?.time ?: return)
-            val durationSeconds = if (durationMillis > 0) durationMillis / 1000f else 0f
-            val speedMps = if (durationSeconds > 0) {
-                distanceMeters / durationSeconds
-            } else 0f // Meter per second
+            if (resolvedActivityType  == "still") {
+                try {
+                    dao.endStillLocation(id, endTime)
+                }
+                catch (e: Exception) {
+                    Log.e(TAG, "Failed to end still location into database", e)
+                    currentTrackingId = null
+                }
 
-            val inferredActivity = when {
-                distanceMeters < 100f || speedMps < 0.3f -> "still"
-                speedMps < 2f -> "walking"
-                speedMps < 15f -> "running"
-                else -> "car"
-            }
-            if (inferredActivity == "still") {
-                dao.endStillLocation(id, endTime)
             } else {
-                dao.deleteMovementActivity(id)
-
                 val movement = MovementActivity(
-                    activityType = inferredActivity,
+                    activityType = resolvedActivityType,
                     startLatitude = startLatitude,
                     startLongitude = startLongitude,
                     endLatitude = currentLocation!!.latitude,
@@ -195,13 +209,60 @@ class LocationService : Service() {
                     startTimeDate = startTime,
                     endTimeDate = endTime
                 )
-                dao.insertMovementActivity(movement)
+                try {
+                    dao.replaceStillWithMovement(id, movement)
+                }
+                catch (e: Exception) {
+                    Log.e(TAG, "Failed to replace still with movement location into database", e)
+                    currentTrackingId = null
+                }
             }
         } else {
-            dao.endStillLocation(id, endTime)
+            try {
+                dao.endStillLocation(id, endTime)
+            }
+            catch (e: Exception) {
+                Log.e(TAG, "Failed to end still location into database", e)
+                currentTrackingId = null
+            }
         }
         currentTrackingId = null
     }
+
+    private fun checkIfStillIsMovement(
+        startLatitude: Double,
+        startLongitude: Double,
+        startTime: Date,
+        endTime: Date,
+        endLatitude: Double,
+        endLongitude: Double,
+    ): String {
+
+        val distanceMeters = distanceInMeters(
+            startLatitude,
+            startLongitude,
+            endLatitude,
+            endLongitude
+        )
+
+        val durationMillis = endTime.time - startTime.time
+        val durationSeconds = if (durationMillis > 0) durationMillis / 1000f else 0f
+
+        val speedMps = if (durationSeconds > 0) {
+            distanceMeters / durationSeconds
+        } else {
+            0f
+        } // meters per second
+
+
+        return when {
+            distanceMeters < 100f || speedMps < 0.3f -> "Still"
+            speedMps < 2f -> "Walking"
+            speedMps < 15f -> "Running"
+            else -> "Driving"
+        }
+    }
+
     private suspend fun startMovementTracking(activityType: Int){
         currentLocation = getLocationOnce()
         val movementActivity = MovementActivity(
@@ -210,11 +271,24 @@ class LocationService : Service() {
             startLongitude = currentLocation?.longitude,
             startTimeDate = Date(),
         )
-        currentTrackingId = dao.insertMovementActivity(movementActivity)
+        try {
+            currentTrackingId = dao.insertMovementActivity(movementActivity)
+        }
+        catch (e: Exception) {
+            Log.e(TAG, "Failed to update current location and add still location into database", e)
+            currentTrackingId = null
+        }
     }
     private suspend fun endMovementTracking(){
         val id = currentTrackingId ?: return
-        dao.endMovementActivity(currentTrackingId, currentLocation?.latitude, currentLocation?.longitude, Date())
+        try {
+            dao.endMovementActivity(currentTrackingId, currentLocation?.latitude, currentLocation?.longitude, Date())
+        }
+        catch (e: Exception) {
+            Log.e(TAG, "Failed to end movement location into database", e)
+            currentTrackingId = null
+        }
+
         currentTrackingId = null
     }
 
