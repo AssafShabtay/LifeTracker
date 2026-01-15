@@ -26,42 +26,112 @@ fun InsertExampleDataButton(dao: ActivityDao) {
 }
 suspend fun insertExampleData(dao: ActivityDao) {
     val now = Date()
-    val oneHour = 60 * 60 * 1000
+    val oneHour = 60 * 60 * 1000L
+    val fifteenMin = 15 * 60 * 1000L
+    val thirtyMin = 30 * 60 * 1000L
+    val fortyFiveMin = 45 * 60 * 1000L
 
     // Still location (1h)
     dao.insertStillLocation(
         StillLocation(
             latitude = 52.52,
             longitude = 13.405,
-            startTimeDate = Date(now.time - 4 * oneHour),
-            endTimeDate = Date(now.time - 3 * oneHour),
+            startTimeDate = Date(now.time - 8 * oneHour),
+            endTimeDate = Date(now.time - 6 * oneHour),
             placeName = "Home"
         )
     )
 
-    // Walking (30 min)
+    // Walking to transit (15 min)
     dao.insertMovementActivity(
         MovementActivity(
             activityType = "Walking",
             startLatitude = 52.52,
             startLongitude = 13.405,
-            endLatitude = 52.525,
+            endLatitude = 52.523,
             endLongitude = 13.41,
-            startTimeDate = Date(now.time - 3 * oneHour),
-            endTimeDate = Date(now.time - (2.5 * oneHour).toLong())
+            startTimeDate = Date(now.time - 6 * oneHour),
+            endTimeDate = Date(now.time - 6 * oneHour + fifteenMin)
         )
     )
 
-    // Driving (1h)
+    // Bus ride (45 min)
+    dao.insertMovementActivity(
+        MovementActivity(
+            activityType = "Bus",
+            startLatitude = 52.523,
+            startLongitude = 13.41,
+            endLatitude = 52.53,
+            endLongitude = 13.42,
+            startTimeDate = Date(now.time - 6 * oneHour + fifteenMin),
+            endTimeDate = Date(now.time - 5 * oneHour)
+        )
+    )
+
+    // Office (3h)
+    dao.insertStillLocation(
+        StillLocation(
+            latitude = 52.53,
+            longitude = 13.42,
+            startTimeDate = Date(now.time - 5 * oneHour),
+            endTimeDate = Date(now.time - 2 * oneHour),
+            placeName = "Office"
+        )
+    )
+
+    // ===== Afternoon =====
+
+    // Walking to lunch (15 min)
+    dao.insertMovementActivity(
+        MovementActivity(
+            activityType = "Walking",
+            startLatitude = 52.53,
+            startLongitude = 13.42,
+            endLatitude = 52.528,
+            endLongitude = 13.418,
+            startTimeDate = Date(now.time - 2 * oneHour),
+            endTimeDate = Date(now.time - 2 * oneHour + fifteenMin)
+        )
+    )
+
+    // Restaurant (45 min)
+    dao.insertStillLocation(
+        StillLocation(
+            latitude = 52.528,
+            longitude = 13.418,
+            startTimeDate = Date(now.time - 2 * oneHour + fifteenMin),
+            endTimeDate = Date(now.time - oneHour)
+            ,
+            placeName = "Restaurant"
+        )
+    )
+
+    // Walking back (15 min)
+    dao.insertMovementActivity(
+        MovementActivity(
+            activityType = "Walking",
+            startLatitude = 52.528,
+            startLongitude = 13.418,
+            endLatitude = 52.53,
+            endLongitude = 13.42,
+            startTimeDate = Date(now.time - oneHour),
+            endTimeDate = Date(now.time - oneHour + fifteenMin)
+        )
+    )
+
+    // ===== Evening =====
+
+    // Driving home (45 min)
     dao.insertMovementActivity(
         MovementActivity(
             activityType = "Driving",
-            startLatitude = 52.525,
-            startLongitude = 13.41,
-            endLatitude = 52.55,
-            endLongitude = 13.45,
-            startTimeDate = Date(now.time - 2 * oneHour),
-            endTimeDate = Date(now.time - oneHour)
+            startLatitude = 52.53,
+            startLongitude = 13.42,
+            endLatitude = 52.52,
+            endLongitude = 13.405,
+            startTimeDate = Date(now.time - oneHour + fifteenMin),
+            endTimeDate = now
         )
     )
+
 }

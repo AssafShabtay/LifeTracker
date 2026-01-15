@@ -63,6 +63,7 @@ data class Pie(
     val selectedScale: Float? = null,
     val selectedPaddingDegree: Float? = null,
     val selected: Boolean = false,
+    val clickable: Boolean = true,
     val colorAnimEnterSpec: AnimationSpec<Color>? = null,
     val scaleAnimEnterSpec: AnimationSpec<Float>? = null,
     val spaceDegreeAnimEnterSpec: AnimationSpec<Float>? = null,
@@ -92,6 +93,20 @@ fun PieChart(
     spaceDegreeAnimExitSpec: AnimationSpec<Float> = spaceDegreeAnimEnterSpec,
     style: Pie.Style = Pie.Style.Fill,
 ) {
+    // Start the first slice from the top (12:00) instead of the default 3:00.
+    val startAngleOffset = -90f
+
+    fun normalizeDegree(deg: Float): Float {
+        val d = deg % 360f
+        return if (d < 0f) d + 360f else d
+    }
+
+    fun isDegreeBetweenWrapped(angle: Float, start: Float, end: Float): Boolean {
+        val a = normalizeDegree(angle)
+        val s = normalizeDegree(start)
+        val e = normalizeDegree(end)
+        return if (s <= e) a in s..e else (a >= s || a <= e)
+    }
 
     require(data.none { it.data < 0 }) { "Data must be at least 0" }
 
@@ -177,16 +192,19 @@ fun PieChart(
         Canvas(
             modifier = modifier.pointerInput(Unit) {
                 detectTapGestures { offset ->
-                    val angle = getAngleInDegree(offset, pieChartCenter)
-                    pieces.firstOrNull {
-                        isDegreeBetween(angle, it.startFromDegree, it.endToDegree)
-                                && isInsideCircle(offset, pieChartCenter, it.radius)
+                    val angle = normalizeDegree(getAngleInDegree(offset, pieChartCenter))
+                    pieces.firstOrNull { piece ->
+                        isDegreeBetweenWrapped(angle, piece.startFromDegree, piece.endToDegree) &&
+                                isInsideCircle(offset, pieChartCenter, piece.radius)
                     }?.let { piece ->
-                        details.find { it.id == piece.id }?.let {
-                            onPieClick(it.pie)
+                        details.find { it.id == piece.id }?.let { detail ->
+                            if (detail.pie.clickable) {
+                                onPieClick(detail.pie)
+                            }
                         }
                     }
                 }
+
             }
         ) {
             pieChartCenter = center
@@ -236,7 +254,7 @@ fun PieChart(
                     val beforeItems = data.filterIndexed { filterIndex, _ -> filterIndex < index }
                     val startFromDegree = beforeItems.sumOf { (it.data * 360) / total }
 
-                    arcStart = startFromDegree.toFloat() + detail.space.value
+                    arcStart = startFromDegree.toFloat() + detail.space.value + startAngleOffset
                     arcSweep = degree.toFloat() - ((detail.space.value * 2) + spaceDegree)
 
                     val p = Path().apply { arcTo(arcRect, arcStart, arcSweep, true) }
@@ -255,8 +273,8 @@ fun PieChart(
                         PiePiece(
                             id = detail.id,
                             radius = radius * detail.scale.value,
-                            startFromDegree = arcStart,
-                            endToDegree = if (arcStart + arcSweep >= 360f) 360f else arcStart + arcSweep,
+                            startFromDegree = normalizeDegree(arcStart),
+                            endToDegree = normalizeDegree(arcStart + arcSweep),
                         )
                     )
 

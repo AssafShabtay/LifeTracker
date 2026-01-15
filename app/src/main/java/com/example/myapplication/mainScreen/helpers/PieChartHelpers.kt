@@ -42,6 +42,21 @@ fun todayRange(): Pair<Date, Date> {
     return start to cal.time
 }
 
+fun totalDurationMinutes(timeline: List<TimelineItem>): Double {
+    return timeline.sumOf { item ->
+        when (item) {
+            is TimelineItem.Still ->
+                durationMinutes(item.item.startTimeDate, item.item.endTimeDate)
+
+            is TimelineItem.Movement ->
+                durationMinutes(item.item.startTimeDate, item.item.endTimeDate)
+
+            is TimelineItem.Remaining ->
+                durationMinutes(item.startTimeDate, item.endTimeDate)
+        }
+    }
+}
+
 suspend fun getTodayTimeline(dao: ActivityDao): List<TimelineItem> {
     //Get the data from today
     val (start, end) = todayRange()
@@ -60,22 +75,28 @@ suspend fun getTodayTimeline(dao: ActivityDao): List<TimelineItem> {
                 is TimelineItem.Remaining -> it.startTimeDate
             }
         }
-    val lastEndTime = timeline
-        .lastOrNull { it is TimelineItem.Still || it is TimelineItem.Movement }
-        ?.let {
-            when (it) {
-                is TimelineItem.Still -> it.item.endTimeDate
-                is TimelineItem.Movement -> it.item.endTimeDate
-                else -> null
-            }
-        } ?: start
 
-    val customSlice = TimelineItem.Remaining(
-        startTimeDate = lastEndTime,
-        endTimeDate = end,
 
-    )
-    return timeline + customSlice
+        if (totalDurationMinutes(timeline)<1440){
+
+            val lastEndTime = timeline
+                .lastOrNull { it is TimelineItem.Still || it is TimelineItem.Movement }
+                ?.let {
+                    when (it) {
+                        is TimelineItem.Still -> it.item.endTimeDate
+                        is TimelineItem.Movement -> it.item.endTimeDate
+                        else -> null
+                    }
+                } ?: start
+
+            val customSlice = TimelineItem.Remaining(
+            startTimeDate = lastEndTime,
+            endTimeDate = end,
+        )
+        return timeline + customSlice
+}
+
+    return timeline
 }
 fun durationMinutes(start: Date?, end: Date?): Double {
     //Return the duration of the activity in minutes
@@ -119,15 +140,17 @@ fun pieDataFromTimeline(timeline: List<TimelineItem>): List<Pie> {
 
         //TODO("ADD ICON AND COLOR")
         //if(item is TimelineItem.Still)
+        val baseColor =  when (item) {
+            is TimelineItem.Still -> Color.Gray
+            is TimelineItem.Movement -> Color(0xFF4CAF50)
+            is TimelineItem.Remaining -> Color(0xFFE0E0E0)
+    }
         Pie(
-            label = "${index + 1}: ${if (item is TimelineItem.Still) "Still" else "Movement"}",
+            label = "${index + 1}:s ${if (item is TimelineItem.Still) "Still" else "Movement"}",
             data = duration,
-            color = when (item) {
-                is TimelineItem.Still -> Color.Gray
-                is TimelineItem.Movement -> Color(0xFF4CAF50)
-                is TimelineItem.Remaining -> Color(0xFFE0E0E0)
-            },
-            selectedColor = if (item is TimelineItem.Still) Color.DarkGray else Color.Green
+            color = baseColor,
+            selectedColor = baseColor.copy(alpha = 0.85f),
+            clickable = item !is TimelineItem.Remaining
         )
     })
 }
