@@ -48,6 +48,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.databinding.adapters)
+    implementation(libs.androidx.compose.ui.geometry)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation ("io.github.ehsannarmani:compose-charts:0.2.0")

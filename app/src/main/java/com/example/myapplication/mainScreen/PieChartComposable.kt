@@ -1,5 +1,8 @@
     package com.example.myapplication.mainScreen
 
+    import SliceCustomizePopover
+    import android.R.attr.maxHeight
+    import android.R.attr.maxWidth
     import androidx.compose.animation.core.Spring
     import androidx.compose.animation.core.spring
     import androidx.compose.animation.core.tween
@@ -23,6 +26,9 @@
     import com.example.myapplication.mainScreen.helpers.pieDataFromTimeline
     import androidx.compose.foundation.layout.Box
     import androidx.compose.runtime.remember
+    import androidx.compose.ui.geometry.Offset
+    import androidx.compose.ui.platform.LocalDensity
+    import androidx.compose.ui.unit.IntOffset
     import androidx.compose.ui.unit.dp
     import androidx.lifecycle.ViewModel
     import androidx.lifecycle.ViewModelProvider
@@ -30,6 +36,12 @@
     import com.example.myapplication.ActivityDao
     import com.example.myapplication.mainScreen.helpers.Pie
     import com.example.myapplication.mainScreen.helpers.PieChart
+
+    private data class SlicePopoverState(
+        val index: Int,
+        val tapOffsetPx: Offset
+    )
+
     @Composable
     fun PieChartComposable(
         dao: ActivityDao,
@@ -45,8 +57,16 @@
 
         val timeline = viewModel.timeline
 
+        var popover by remember { mutableStateOf<SlicePopoverState?>(null) }
+
         var pieData by remember(timeline) {
             mutableStateOf(pieDataFromTimeline(timeline))
+        }
+        val density = LocalDensity.current
+        val containerSizePx = remember(maxWidth, maxHeight) {
+            with(density) {
+                IntOffset(maxWidth, maxHeight)
+            }
         }
 
         Box(
@@ -63,10 +83,11 @@
             PieChart(
                 modifier = Modifier.size(300.dp),
                 data = pieData,
-                onPieClick = { clickedPie ->
+                onPieClick = { clickedPie , tapOffset ->
                     val index = pieData.indexOf(clickedPie)
 
                     if (index != -1) {
+                        popover = SlicePopoverState(index, tapOffset)
                         pieData =
                             if (pieData[index].selected) {
                                 deselectAll(pieData)
@@ -86,10 +107,22 @@
                 colorAnimExitSpec = tween(300),
                 scaleAnimExitSpec = tween(300),
                 spaceDegreeAnimExitSpec = tween(300),
-                spaceDegree = 3f,
-                selectedPaddingDegree = 4f,
-                style = Pie.Style.Stroke(width = 65.dp)
+                spaceDegree = 1.5f,
+                selectedPaddingDegree = 1.5f,
+                style = Pie.Style.Stroke(width = 70.dp)
 
+            )
+            val st = popover
+            SliceCustomizePopover(
+                expanded = st != null,
+                anchorOffsetPx = st?.tapOffsetPx ?: Offset.Zero,
+                containerSizePx = containerSizePx,
+                pie = st?.let { pieData.getOrNull(it.index) },
+                onClose = { popover = null },
+                onUpdatePie = { updated ->
+                    val s = popover ?: return@SliceCustomizePopover
+                    pieData = pieData.mapIndexed { i, p -> if (i == s.index) updated else p }
+                }
             )
         }
     }

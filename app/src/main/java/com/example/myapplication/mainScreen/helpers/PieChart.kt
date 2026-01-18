@@ -82,7 +82,7 @@ fun PieChart(
     modifier: Modifier = Modifier,
     data: List<Pie>,
     spaceDegree: Float = 0f,
-    onPieClick: (Pie) -> Unit = {},
+    onPieClick: (Pie, Offset) -> Unit = { _, _ -> },
     selectedScale: Float = 1.1f,
     selectedPaddingDegree: Float = 5f,
     colorAnimEnterSpec: AnimationSpec<Color> = tween(500),
@@ -193,20 +193,34 @@ fun PieChart(
             modifier = modifier.pointerInput(Unit) {
                 detectTapGestures { offset ->
                     val angle = normalizeDegree(getAngleInDegree(offset, pieChartCenter))
+                    val distance = (offset - pieChartCenter).getDistance()
+
                     pieces.firstOrNull { piece ->
+                        val strokeWidthPx =
+                            (style as? Pie.Style.Stroke)?.width?.toPx() ?: 0f
+
+                        val halfStroke = strokeWidthPx / 2f
+
+                        val innerRadius = (piece.radius - halfStroke).coerceAtLeast(0f)
+                        val outerRadius = piece.radius + halfStroke
+
                         isDegreeBetweenWrapped(angle, piece.startFromDegree, piece.endToDegree) &&
-                                isInsideCircle(offset, pieChartCenter, piece.radius)
+                                distance in innerRadius..outerRadius
+
                     }?.let { piece ->
                         details.find { it.id == piece.id }?.let { detail ->
                             if (detail.pie.clickable) {
-                                onPieClick(detail.pie)
+                                onPieClick(detail.pie, offset)
                             }
                         }
                     }
                 }
 
+
+
             }
         ) {
+            pieces.clear()
             pieChartCenter = center
 
             val radius = when (style) {
