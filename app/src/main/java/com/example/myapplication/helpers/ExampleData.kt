@@ -34,8 +34,8 @@ suspend fun insertExampleData(dao: ActivityDao) {
     // Still location (1h)
     dao.insertStillLocation(
         StillLocation(
-            latitude = 52.52,
-            longitude = 13.405,
+            lat = 52.52,
+            lng = 13.405,
             startTimeDate = Date(now.time - 8 * oneHour),
             endTimeDate = Date(now.time - 6 * oneHour),
             placeName = "Home"
@@ -46,10 +46,10 @@ suspend fun insertExampleData(dao: ActivityDao) {
     dao.insertMovementActivity(
         MovementActivity(
             activityType = "Walking",
-            startLatitude = 52.52,
-            startLongitude = 13.405,
-            endLatitude = 52.523,
-            endLongitude = 13.41,
+            startLat = 52.52,
+            startLng = 13.405,
+            endLat = 52.523,
+            endLng = 13.41,
             startTimeDate = Date(now.time - 6 * oneHour),
             endTimeDate = Date(now.time - 6 * oneHour + fifteenMin)
         )
@@ -59,10 +59,10 @@ suspend fun insertExampleData(dao: ActivityDao) {
     dao.insertMovementActivity(
         MovementActivity(
             activityType = "Bus",
-            startLatitude = 52.523,
-            startLongitude = 13.41,
-            endLatitude = 52.53,
-            endLongitude = 13.42,
+            startLat = 52.523,
+            startLng = 13.41,
+            endLat = 52.53,
+            endLng = 13.42,
             startTimeDate = Date(now.time - 6 * oneHour + fifteenMin),
             endTimeDate = Date(now.time - 5 * oneHour)
         )
@@ -71,8 +71,8 @@ suspend fun insertExampleData(dao: ActivityDao) {
     // Office (3h)
     dao.insertStillLocation(
         StillLocation(
-            latitude = 52.53,
-            longitude = 13.42,
+            lat = 52.53,
+            lng = 13.42,
             startTimeDate = Date(now.time - 5 * oneHour),
             endTimeDate = Date(now.time - 2 * oneHour),
             placeName = "Office"
@@ -85,10 +85,10 @@ suspend fun insertExampleData(dao: ActivityDao) {
     dao.insertMovementActivity(
         MovementActivity(
             activityType = "Walking",
-            startLatitude = 52.53,
-            startLongitude = 13.42,
-            endLatitude = 52.528,
-            endLongitude = 13.418,
+            startLat = 52.53,
+            startLng = 13.42,
+            endLat = 52.528,
+            endLng = 13.418,
             startTimeDate = Date(now.time - 2 * oneHour),
             endTimeDate = Date(now.time - 2 * oneHour + fifteenMin)
         )
@@ -97,8 +97,8 @@ suspend fun insertExampleData(dao: ActivityDao) {
     // Restaurant (45 min)
     dao.insertStillLocation(
         StillLocation(
-            latitude = 52.528,
-            longitude = 13.418,
+            lat = 52.528,
+            lng = 13.418,
             startTimeDate = Date(now.time - 2 * oneHour + fifteenMin),
             endTimeDate = Date(now.time - oneHour)
             ,
@@ -110,10 +110,10 @@ suspend fun insertExampleData(dao: ActivityDao) {
     dao.insertMovementActivity(
         MovementActivity(
             activityType = "Walking",
-            startLatitude = 52.528,
-            startLongitude = 13.418,
-            endLatitude = 52.53,
-            endLongitude = 13.42,
+            startLat = 52.528,
+            startLng = 13.418,
+            endLat = 52.53,
+            endLng = 13.42,
             startTimeDate = Date(now.time - oneHour),
             endTimeDate = Date(now.time - oneHour + fifteenMin)
         )
@@ -125,10 +125,10 @@ suspend fun insertExampleData(dao: ActivityDao) {
     dao.insertMovementActivity(
         MovementActivity(
             activityType = "Driving",
-            startLatitude = 52.53,
-            startLongitude = 13.42,
-            endLatitude = 52.52,
-            endLongitude = 13.405,
+            startLat = 52.53,
+            startLng = 13.42,
+            endLat = 52.52,
+            endLng = 13.405,
             startTimeDate = Date(now.time - oneHour + fifteenMin),
             endTimeDate = now
         )

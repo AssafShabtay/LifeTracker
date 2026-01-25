@@ -6,7 +6,6 @@ import android.content.Intent
 import android.location.Location
 import android.os.IBinder
 import android.util.Log
-import androidx.room.Transaction
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -150,8 +149,8 @@ class LocationService : Service() {
     private suspend fun startStillTracking(){
         currentLocation = getLocationOnce()
         val stillLocation = StillLocation(
-            latitude = currentLocation?.latitude,
-            longitude = currentLocation?.longitude,
+            lat = currentLocation?.latitude,
+            lng = currentLocation?.longitude,
             startTimeDate = Date(),
 
         )
@@ -175,15 +174,15 @@ class LocationService : Service() {
             return
         }
 
-        val startLatitude = still.latitude
-        val startLongitude = still.longitude
+        val startLat = still.lat
+        val startLng = still.lng
         val startTime = still.startTimeDate
         val endTime = Date()
-        if (startLatitude != null && startLongitude != null && currentLocation?.latitude != null && currentLocation?.longitude != null) {
+        if (startLat != null && startLng != null && currentLocation?.latitude != null && currentLocation?.longitude != null) {
 
             val resolvedActivityType = checkIfStillIsMovement(
-                startLatitude = startLatitude,
-                startLongitude = startLongitude,
+                startLatitude = startLat,
+                startLongitude = startLng,
                 endTime =endTime,
                 startTime= startTime,
                 endLatitude = currentLocation!!.latitude,
@@ -202,10 +201,10 @@ class LocationService : Service() {
             } else {
                 val movement = MovementActivity(
                     activityType = resolvedActivityType,
-                    startLatitude = startLatitude,
-                    startLongitude = startLongitude,
-                    endLatitude = currentLocation!!.latitude,
-                    endLongitude = currentLocation!!.longitude,
+                    startLat = startLat,
+                    startLng = startLng,
+                    endLat = currentLocation!!.latitude,
+                    endLng = currentLocation!!.longitude,
                     startTimeDate = startTime,
                     endTimeDate = endTime
                 )
@@ -267,8 +266,8 @@ class LocationService : Service() {
         currentLocation = getLocationOnce()
         val movementActivity = MovementActivity(
             activityType = getActivityName(activityType),
-            startLatitude = currentLocation?.latitude,
-            startLongitude = currentLocation?.longitude,
+            startLat = currentLocation?.latitude,
+            startLng = currentLocation?.longitude,
             startTimeDate = Date(),
         )
         try {
@@ -322,8 +321,8 @@ class LocationService : Service() {
             DetectedActivity.ON_BICYCLE -> "Cycling"
             DetectedActivity.ON_FOOT -> "On Foot"
             DetectedActivity.RUNNING -> "Running"
-            DetectedActivity.STILL -> "Still"
             DetectedActivity.WALKING -> "Walking"
+            DetectedActivity.STILL -> "Still"
             DetectedActivity.UNKNOWN -> "Still"
             else -> "Unknown"
         }

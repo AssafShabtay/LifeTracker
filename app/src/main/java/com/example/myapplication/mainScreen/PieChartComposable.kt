@@ -129,5 +129,6 @@
 
 
     fun deselectAll(data: List<Pie>): List<Pie> =
-        data.map { it.copy(selected = false) }
+        data.map { it.copy(selected = false)
+        }
 

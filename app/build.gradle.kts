@@ -5,6 +5,17 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
+    id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
+}
+
+secrets {
+    // Optionally specify a different file name containing your secrets.
+    // The plugin defaults to "local.properties"
+    propertiesFileName = "secrets.properties"
+
+    // A properties file containing default secret values. This file can be
+    // checked in version control.
+    defaultPropertiesFileName = "local.defaults.properties"
 }
 
 android {
@@ -47,6 +58,12 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.compose.material.icons.extended) //TODO use R8 / ProGuard to remove unused icons https://developer.android.com/reference/kotlin/androidx/compose/material/icons/Icons.AutoMirrored
+    val mapsComposeVersion = "4.4.1"
+    implementation("com.google.maps.android:maps-compose:$mapsComposeVersion")
+    implementation("com.google.maps.android:maps-compose-utils:$mapsComposeVersion")
+    implementation("com.google.maps.android:maps-compose-widgets:$mapsComposeVersion")
+    implementation(libs.play.services.maps)
     implementation(libs.androidx.databinding.adapters)
     implementation(libs.androidx.compose.ui.geometry)
     ksp(libs.androidx.room.compiler)

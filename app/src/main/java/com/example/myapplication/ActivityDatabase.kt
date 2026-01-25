@@ -45,8 +45,8 @@ abstract class ActivityDatabase : RoomDatabase() {
 data class StillLocation(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val latitude: Double?,
-    val longitude: Double?,
+    val lat: Double?,
+    val lng: Double?,
     val startTimeDate: Date,
     val endTimeDate: Date? = null,
     val wasSupposedToBeActivity: String? = null, // If this was detected during a movement activity
@@ -61,10 +61,10 @@ data class MovementActivity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val activityType: String,
-    val startLatitude: Double?,
-    val startLongitude: Double?,
-    val endLatitude: Double? = null,
-    val endLongitude: Double? = null,
+    val startLat: Double?,
+    val startLng: Double?,
+    val endLat: Double? = null,
+    val endLng: Double? = null,
     val startTimeDate: Date,
     val endTimeDate : Date? = null,
 )
@@ -99,7 +99,7 @@ interface ActivityDao {
     @Query("DELETE FROM movement_activities WHERE id = :id")
     suspend fun deleteMovementActivity(id: Long)
 
-    @Query("""UPDATE movement_activities SET endLatitude = :endLatitude, endLongitude = :endLongitude, endTimeDate= :endTimeDate WHERE id = :id""")
+    @Query("""UPDATE movement_activities SET endLat = :endLatitude, endLng = :endLongitude, endTimeDate= :endTimeDate WHERE id = :id""")
     suspend fun endMovementActivity(
         id: Long?,
         endLatitude: Double?,

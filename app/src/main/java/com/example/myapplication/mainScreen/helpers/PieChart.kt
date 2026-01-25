@@ -57,6 +57,10 @@ data class Pie(
     val label: String? = null,
     val data: Double,
     val color: Color,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val endLat: Double? = null,
+    val endLng: Double? = null,
     val durationText: String? = null,
     val icon: ImageVector? = null,
     val selectedColor: Color = color,
@@ -304,8 +308,20 @@ fun PieChart(
 // ---------- ICON + DURATION (drawn over slice) ----------
                 detail.pie.durationText?.let { duration ->
                     val midAngle = arcStart + arcSweep / 2f
-                    val labelRadius = radius * detail.scale.value * 0.65f
 
+// --- FIX: account for stroke thickness ---
+                    val strokeWidthPx =
+                        ((detail.pie.style ?: style) as? Pie.Style.Stroke)?.width?.toPx() ?: 0f
+
+// The visible arc sits around the middle of the stroke
+                    val adjustedRadius = radius + strokeWidthPx / 2f
+
+// Place label at middle of the stroke ring
+                    val labelRadius =
+                        if (strokeWidthPx > 0f)
+                            adjustedRadius * 0.75f   // closer to middle of ring
+                        else
+                            radius * 0.65f
                     val labelCenter = Offset(
                         x = center.x + labelRadius * cos(Math.toRadians(midAngle.toDouble())).toFloat(),
                         y = center.y + labelRadius * sin(Math.toRadians(midAngle.toDouble())).toFloat()

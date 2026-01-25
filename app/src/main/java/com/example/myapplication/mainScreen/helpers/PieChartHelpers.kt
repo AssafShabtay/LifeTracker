@@ -1,5 +1,12 @@
 package com.example.myapplication.mainScreen.helpers
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.ui.graphics.Color
 import com.example.myapplication.ActivityDao
 import com.example.myapplication.MovementActivity
@@ -7,6 +14,7 @@ import com.example.myapplication.StillLocation
 
 import java.util.Calendar
 import java.util.Date
+import java.util.Locale
 
 sealed class TimelineItem { //Class to organize data into timeline
     data class Still(val item: StillLocation): TimelineItem()
@@ -115,9 +123,7 @@ fun durationMinutes(start: Date?, end: Date?): Double {
 fun pieDataFromTimeline(timeline: List<TimelineItem>): List<Pie> {
     //Converts the timeline into pie data
     //TODO instead of rebuilding the data each time, we can just update the pie chart
-    //TODO ADD ICONS
     //TODO ADD COLORS
-    //TODO ADD TEXT
     return normalizePieByAngle(timeline.mapIndexed { index, item ->
 
         val duration = when (item) {
@@ -138,23 +144,57 @@ fun pieDataFromTimeline(timeline: List<TimelineItem>): List<Pie> {
 
 
 
-        //TODO("ADD ICON AND COLOR")
+        //TODO(" COLOR")
         //if(item is TimelineItem.Still)
         val baseColor =  when (item) {
             is TimelineItem.Still -> Color.Gray
             is TimelineItem.Movement -> Color(0xFF4CAF50)
             is TimelineItem.Remaining -> Color(0xFFE0E0E0)
     }
+        val icon =  when (item) {
+            is TimelineItem.Still -> Icons.Filled.Home
+            is TimelineItem.Movement -> when (item.item.activityType) {
+                "Driving" -> Icons.Filled.DirectionsCar
+                "Cycling" -> Icons.AutoMirrored.Filled.DirectionsBike
+                "Running" -> Icons.AutoMirrored.Filled.DirectionsRun
+                "On Foot" -> Icons.AutoMirrored.Filled.DirectionsWalk
+                "Walking" -> Icons.AutoMirrored.Filled.DirectionsWalk
+                else -> null
+            }
+
+            is TimelineItem.Remaining -> null
+        }
+        val latLng = when (item) {
+            is TimelineItem.Still -> item.item.lat to item.item.lng
+            is TimelineItem.Movement -> item.item.startLat to item.item.startLng
+            else -> null
+        }
+        val endLatLng = when(item){
+            is TimelineItem.Movement -> item.item.endLat to item.item.endLng
+            else -> null
+        }
+
         Pie(
-            label = "${index + 1}:s ${if (item is TimelineItem.Still) "Still" else "Movement"}",
+            label = "...",
             data = duration,
             color = baseColor,
+            lat = latLng?.first,
+            lng = latLng?.second,
+            endLat = endLatLng?.first,
+            endLng = endLatLng?.second,
+            durationText = minutesToTimeStamp(duration),
+            icon = icon,
             selectedColor = baseColor.copy(alpha = 0.85f),
             clickable = item !is TimelineItem.Remaining
+
         )
     })
 }
-
+private fun minutesToTimeStamp(minutes: Double): String {
+    val hours = minutes/60
+    val minutes = minutes %60
+    return String.format(Locale.US, "%.0fh %.2fm", hours, minutes)
+}
 private fun normalizePieByAngle(raw: List<Pie>): List<Pie> {
 
     val rawAngles = raw.map {

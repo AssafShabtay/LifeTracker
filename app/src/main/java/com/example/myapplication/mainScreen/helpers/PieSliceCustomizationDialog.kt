@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.example.myapplication.mainScreen.helpers.Pie
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -91,10 +97,11 @@ fun SliceCustomizePopover(
     Popup(
         alignment = Alignment.TopStart,
         offset = animatedOffset,
+        onDismissRequest = { onClose() },
         properties = PopupProperties(
             focusable = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = false
+            dismissOnClickOutside = true
         )
     ) {
         AnimatedVisibility(
@@ -137,13 +144,44 @@ fun SliceCustomizePopover(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        IconButton(onClick = onClose) {
-                            Icon(Icons.Default.Close, contentDescription = "Close")
-                        }
                     }
 
                     Divider()
+                    val lat = pie.lat
+                    val lng = pie.lng
+                    val endLat = pie.lat
+                    val endLng = pie.lng
+                    //if(endLat != null && endLng != null){
+//
+                    //}
+                    //else
+                    if (lat != null && lng != null) {
 
+                        val markerPosition = LatLng(lat, lng)
+
+                        val cameraPositionState = rememberCameraPositionState()
+
+                        // 🔥 Move camera every time marker changes
+                        LaunchedEffect(markerPosition) {
+                            cameraPositionState.animate(
+                                update = com.google.android.gms.maps.CameraUpdateFactory
+                                    .newLatLngZoom(markerPosition, 15f)
+                            )
+                        }
+
+                        GoogleMap(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp),
+                            cameraPositionState = cameraPositionState
+                        ) {
+                            Marker(
+                                state = MarkerState(position = LatLng(lat, lng)),
+                                title = pie.label
+                            )
+                        }
+                    }
+                    Divider()
                     // Color chips
                     Text(
                         text = "Color",
@@ -196,28 +234,6 @@ fun SliceCustomizePopover(
                                 )
                             }
                         )
-                    }
-
-                    Divider()
-
-                    // Quick actions
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        FilledTonalButton(
-                            modifier = Modifier.weight(1f),
-                            onClick = { onUpdatePie(pie.copy(selected = !pie.selected)) }
-                        ) {
-                            Text(if (pie.selected) "Unhighlight" else "Highlight")
-                        }
-
-                        OutlinedButton(
-                            modifier = Modifier.weight(1f),
-                            onClick = { onUpdatePie(pie.copy(clickable = !pie.clickable)) }
-                        ) {
-                            Text(if (pie.clickable) "Disable tap" else "Enable tap")
-                        }
                     }
                 }
             }

@@ -9,6 +9,7 @@ espressoCore = "3.5.1"
 lifecycleRuntimeKtx = "2.6.1"
 activityCompose = "1.8.0"
 composeBom = "2024.09.00"
+materialIconsExtended = "1.7.8"
 roomCommonJvm = "2.8.4"
 roomKtx = "2.8.4"
 playServicesLocation = "21.3.0"
@@ -16,8 +17,10 @@ runtime = "1.10.0"
 lifecycleViewmodelKtx = "2.10.0"
 databindingAdapters = "8.13.2"
 uiGeometry = "1.10.1"
+play-services-maps = "18.2.0"
 
 [libraries]
+androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "androidxRoomCompiler" }
@@ -41,6 +44,7 @@ androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
 androidx-databinding-adapters = { group = "androidx.databinding", name = "databinding-adapters", version.ref = "databindingAdapters" }
 androidx-compose-ui-geometry = { group = "androidx.compose.ui", name = "ui-geometry", version.ref = "uiGeometry" }
+play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "play-services-maps" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
