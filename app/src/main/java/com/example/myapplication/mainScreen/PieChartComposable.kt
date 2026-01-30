@@ -1,6 +1,7 @@
     package com.example.myapplication.mainScreen
 
     import SliceCustomizePopover
+    import SliceCustomizePopoverMovement
     import android.R.attr.maxHeight
     import android.R.attr.maxWidth
     import androidx.compose.animation.core.Spring
@@ -36,6 +37,7 @@
     import com.example.myapplication.ActivityDao
     import com.example.myapplication.mainScreen.helpers.Pie
     import com.example.myapplication.mainScreen.helpers.PieChart
+    import com.example.myapplication.mainScreen.helpers.PieType
 
     private data class SlicePopoverState(
         val index: Int,
@@ -57,7 +59,8 @@
 
         val timeline = viewModel.timeline
 
-        var popover by remember { mutableStateOf<SlicePopoverState?>(null) }
+        var stillPopover by remember { mutableStateOf<SlicePopoverState?>(null) }
+        var movementPopover by remember { mutableStateOf<SlicePopoverState?>(null) }
 
         var pieData by remember(timeline) {
             mutableStateOf(pieDataFromTimeline(timeline))
@@ -87,7 +90,15 @@
                     val index = pieData.indexOf(clickedPie)
 
                     if (index != -1) {
-                        popover = SlicePopoverState(index, tapOffset)
+
+                        if(clickedPie.type==PieType.Movement){
+                            movementPopover = SlicePopoverState(index, tapOffset)
+                            stillPopover = null
+                        }
+                        else if(clickedPie.type==PieType.Still){
+                            stillPopover  = SlicePopoverState(index, tapOffset)
+                            movementPopover = null
+                        }
                         pieData =
                             if (pieData[index].selected) {
                                 deselectAll(pieData)
@@ -112,18 +123,32 @@
                 style = Pie.Style.Stroke(width = 70.dp)
 
             )
-            val st = popover
+            val still = stillPopover
             SliceCustomizePopover(
-                expanded = st != null,
-                anchorOffsetPx = st?.tapOffsetPx ?: Offset.Zero,
+                expanded = still != null,
+                anchorOffsetPx = still?.tapOffsetPx ?: Offset.Zero,
                 containerSizePx = containerSizePx,
-                pie = st?.let { pieData.getOrNull(it.index) },
-                onClose = { popover = null },
+                pie = still?.let { pieData.getOrNull(it.index) },
+                onClose = { stillPopover = null },
                 onUpdatePie = { updated ->
-                    val s = popover ?: return@SliceCustomizePopover
+                    val s = stillPopover ?: return@SliceCustomizePopover
                     pieData = pieData.mapIndexed { i, p -> if (i == s.index) updated else p }
                 }
             )
+
+            val movement = movementPopover
+            SliceCustomizePopoverMovement(
+                expanded = movement != null,
+                anchorOffsetPx = movement?.tapOffsetPx ?: Offset.Zero,
+                containerSizePx = containerSizePx,
+                pie = movement?.let { pieData.getOrNull(it.index) },
+                onClose = { movementPopover = null },
+                onUpdatePie = { updated ->
+                    val s = movementPopover ?: return@SliceCustomizePopoverMovement
+                    pieData = pieData.mapIndexed { i, p -> if (i == s.index) updated else p }
+                }
+            )
+
         }
     }
 

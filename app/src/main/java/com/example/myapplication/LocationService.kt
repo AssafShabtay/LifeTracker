@@ -279,7 +279,6 @@ class LocationService : Service() {
         }
     }
     private suspend fun endMovementTracking(){
-        val id = currentTrackingId ?: return
         try {
             dao.endMovementActivity(currentTrackingId, currentLocation?.latitude, currentLocation?.longitude, Date())
         }

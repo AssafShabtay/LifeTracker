@@ -4,7 +4,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.ui.graphics.Color
@@ -14,7 +13,6 @@ import com.example.myapplication.StillLocation
 
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 
 sealed class TimelineItem { //Class to organize data into timeline
     data class Still(val item: StillLocation): TimelineItem()
@@ -26,7 +24,11 @@ sealed class TimelineItem { //Class to organize data into timeline
         val endTimeDate: Date,
     ) : TimelineItem()
 }
-
+enum class PieType{
+    Movement,
+    Still,
+    Remaining
+}
 private const val TOTAL_MINUTES = 1440.0
 private const val FULL_CIRCLE_DEG = 360.0
 private const val MIN_ANGLE_DEG = 25.0
@@ -50,7 +52,7 @@ fun todayRange(): Pair<Date, Date> {
     return start to cal.time
 }
 
-fun totalDurationMinutes(timeline: List<TimelineItem>): Double {
+fun totalDurationMinutes(timeline: List<TimelineItem>): Int {
     return timeline.sumOf { item ->
         when (item) {
             is TimelineItem.Still ->
@@ -106,20 +108,27 @@ suspend fun getTodayTimeline(dao: ActivityDao): List<TimelineItem> {
 
     return timeline
 }
-fun durationMinutes(start: Date?, end: Date?): Double {
-    //Return the duration of the activity in minutes
-    if (start == null) return 0.0
+fun durationMinutes(start: Date?, end: Date?): Int {
+    // Return the duration of the activity in minutes
+    if (start == null) return 0
+
     val (startOfDay, endOfDay) = todayRange()
-    val end = if (end == null) Date() else end
-    if(start.time !in startOfDay.time..endOfDay.time){
-        return (end.time - startOfDay.time).coerceAtLeast(0) / 1000.0 / 60.0
-    }
-    if(end.time !in startOfDay.time..endOfDay.time){
-        return (endOfDay.time - start.time).coerceAtLeast(0) / 1000.0 / 60.0
+    val actualEnd = end ?: Date()
+
+    if (start.time !in startOfDay.time..endOfDay.time) {
+        return ((actualEnd.time - startOfDay.time)
+            .coerceAtLeast(0) / 1000 / 60).toInt()
     }
 
-    return (end.time - start.time).coerceAtLeast(0) / 1000.0 / 60.0
+    if (actualEnd.time !in startOfDay.time..endOfDay.time) {
+        return ((endOfDay.time - start.time)
+            .coerceAtLeast(0) / 1000 / 60).toInt()
+    }
+
+    return ((actualEnd.time - start.time)
+        .coerceAtLeast(0) / 1000 / 60).toInt()
 }
+
 fun pieDataFromTimeline(timeline: List<TimelineItem>): List<Pie> {
     //Converts the timeline into pie data
     //TODO instead of rebuilding the data each time, we can just update the pie chart
@@ -173,7 +182,11 @@ fun pieDataFromTimeline(timeline: List<TimelineItem>): List<Pie> {
             is TimelineItem.Movement -> item.item.endLat to item.item.endLng
             else -> null
         }
-
+        val pieType = when (item) {
+            is TimelineItem.Still -> PieType.Still
+            is TimelineItem.Movement -> PieType.Movement
+            is TimelineItem.Remaining -> PieType.Remaining
+        }
         Pie(
             label = "...",
             data = duration,
@@ -182,18 +195,27 @@ fun pieDataFromTimeline(timeline: List<TimelineItem>): List<Pie> {
             lng = latLng?.second,
             endLat = endLatLng?.first,
             endLng = endLatLng?.second,
-            durationText = minutesToTimeStamp(duration),
+            durationText = if (item is TimelineItem.Remaining) null
+            else minutesToTimeStamp(duration),
             icon = icon,
+            type = pieType,
             selectedColor = baseColor.copy(alpha = 0.85f),
             clickable = item !is TimelineItem.Remaining
 
         )
     })
 }
-private fun minutesToTimeStamp(minutes: Double): String {
-    val hours = minutes/60
-    val minutes = minutes %60
-    return String.format(Locale.US, "%.0fh %.2fm", hours, minutes)
+private fun minutesToTimeStamp(minutes: Int): String {
+    val hours = minutes / 60
+    val remainingMinutes = minutes % 60
+
+    return if (hours == 0) {
+        "${remainingMinutes}m"
+        } else if (remainingMinutes == 0) {
+        "${hours}h"
+    } else {
+        "${hours}h ${remainingMinutes}m"
+    }
 }
 private fun normalizePieByAngle(raw: List<Pie>): List<Pie> {
 
@@ -208,18 +230,18 @@ private fun normalizePieByAngle(raw: List<Pie>): List<Pie> {
         val scale = FULL_CIRCLE_DEG / rawAngles.sum()
 
         return raw.mapIndexed { i, pie ->
-            pie.copy(data = rawAngles[i] * scale)
+            pie.copy(data = (rawAngles[i] * scale).toInt())
         }
     }
 
-    // Case 2: Minimums are possible
+    // Case 2: Minimums are possibl e
     val clamped = rawAngles.map { it.coerceAtLeast(MIN_ANGLE_DEG) }
     val clampedSum = clamped.sum()
 
     // No overflow
     if (clampedSum <= FULL_CIRCLE_DEG) {
         return raw.mapIndexed { i, pie ->
-            pie.copy(data = clamped[i])
+            pie.copy(data = clamped[i].toInt())
         }
     }
 
@@ -234,7 +256,7 @@ private fun normalizePieByAngle(raw: List<Pie>): List<Pie> {
     }
 
     return raw.mapIndexed { i, pie ->
-        pie.copy(data = finalAngles[i])
+        pie.copy(data = finalAngles[i].toInt())
     }
 }
 

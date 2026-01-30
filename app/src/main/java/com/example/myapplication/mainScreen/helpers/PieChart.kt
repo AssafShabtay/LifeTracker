@@ -13,8 +13,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isUnspecified
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
@@ -37,11 +34,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import ir.ehsannarmani.compose_charts.components.LabelHelper
 import ir.ehsannarmani.compose_charts.extensions.getAngleInDegree
-import ir.ehsannarmani.compose_charts.extensions.isDegreeBetween
-import ir.ehsannarmani.compose_charts.extensions.isInsideCircle
-import ir.ehsannarmani.compose_charts.models.LabelHelperProperties
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 import androidx.compose.animation.core.AnimationSpec
@@ -55,7 +48,7 @@ import kotlin.math.sin
 
 data class Pie(
     val label: String? = null,
-    val data: Double,
+    val data: Int,
     val color: Color,
     val lat: Double? = null,
     val lng: Double? = null,
@@ -63,6 +56,7 @@ data class Pie(
     val endLng: Double? = null,
     val durationText: String? = null,
     val icon: ImageVector? = null,
+    val type: PieType,
     val selectedColor: Color = color,
     val selectedScale: Float? = null,
     val selectedPaddingDegree: Float? = null,
@@ -74,7 +68,7 @@ data class Pie(
     val colorAnimExitSpec: AnimationSpec<Color>? = null,
     val scaleAnimExitSpec: AnimationSpec<Float>? = null,
     val spaceDegreeAnimExitSpec: AnimationSpec<Float>? = null,
-    val style: Style? = null
+    val style: Style        ? = null
 ) {
     sealed class Style {
         data object Fill : Style()
@@ -309,22 +303,35 @@ fun PieChart(
                 detail.pie.durationText?.let { duration ->
                     val midAngle = arcStart + arcSweep / 2f
 
-// --- FIX: account for stroke thickness ---
+// ✅ Pop-out distance when selected
+                    val popOutDistance =
+                        (detail.scale.value - 1f) * 100.dp.toPx()
+
+// Direction outward
+                    val offsetX =
+                        popOutDistance * cos(Math.toRadians(midAngle.toDouble())).toFloat()
+                    val offsetY =
+                        popOutDistance * sin(Math.toRadians(midAngle.toDouble())).toFloat()
+
+// Stroke thickness adjustment
                     val strokeWidthPx =
                         ((detail.pie.style ?: style) as? Pie.Style.Stroke)?.width?.toPx() ?: 0f
 
-// The visible arc sits around the middle of the stroke
                     val adjustedRadius = radius + strokeWidthPx / 2f
 
-// Place label at middle of the stroke ring
+// Label radius inside the slice
                     val labelRadius =
                         if (strokeWidthPx > 0f)
-                            adjustedRadius * 0.75f   // closer to middle of ring
+                            adjustedRadius * 0.77f
                         else
                             radius * 0.65f
+
+// ✅ Label center moves with slice
                     val labelCenter = Offset(
-                        x = center.x + labelRadius * cos(Math.toRadians(midAngle.toDouble())).toFloat(),
-                        y = center.y + labelRadius * sin(Math.toRadians(midAngle.toDouble())).toFloat()
+                        x = center.x + offsetX +
+                                labelRadius * cos(Math.toRadians(midAngle.toDouble())).toFloat(),
+                        y = center.y + offsetY +
+                                labelRadius * sin(Math.toRadians(midAngle.toDouble())).toFloat()
                     )
 
                     val painter = detail.pie.icon?.let { iconPainters[it] }
