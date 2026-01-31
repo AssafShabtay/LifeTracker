@@ -65,11 +65,9 @@
         var pieData by remember(timeline) {
             mutableStateOf(pieDataFromTimeline(timeline))
         }
-        val density = LocalDensity.current
+
         val containerSizePx = remember(maxWidth, maxHeight) {
-            with(density) {
-                IntOffset(maxWidth, maxHeight)
-            }
+            IntOffset(maxWidth, maxHeight)
         }
 
         Box(
@@ -90,7 +88,7 @@
                     val index = pieData.indexOf(clickedPie)
 
                     if (index != -1) {
-
+                        // Open popover
                         if(clickedPie.type==PieType.Movement){
                             movementPopover = SlicePopoverState(index, tapOffset)
                             stillPopover = null
@@ -99,6 +97,7 @@
                             stillPopover  = SlicePopoverState(index, tapOffset)
                             movementPopover = null
                         }
+                        // Slice selection logic
                         pieData =
                             if (pieData[index].selected) {
                                 deselectAll(pieData)
@@ -123,7 +122,8 @@
                 style = Pie.Style.Stroke(width = 70.dp)
 
             )
-            val still = stillPopover
+            //Composable popover
+            val still = stillPopover //Stores the SlicePopoverState(which pie is selected)
             SliceCustomizePopover(
                 expanded = still != null,
                 anchorOffsetPx = still?.tapOffsetPx ?: Offset.Zero,
@@ -136,7 +136,7 @@
                 }
             )
 
-            val movement = movementPopover
+            val movement = movementPopover //Stores the SlicePopoverState(which pie is selected)
             SliceCustomizePopoverMovement(
                 expanded = movement != null,
                 anchorOffsetPx = movement?.tapOffsetPx ?: Offset.Zero,

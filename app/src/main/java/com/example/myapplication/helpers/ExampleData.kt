@@ -58,7 +58,7 @@ suspend fun insertExampleData(dao: ActivityDao) {
     // Bus ride (45 min)
     dao.insertMovementActivity(
         MovementActivity(
-            activityType = "Bus",
+            activityType = "On Foot",
             startLat = 52.523,
             startLng = 13.41,
             endLat = 52.53,

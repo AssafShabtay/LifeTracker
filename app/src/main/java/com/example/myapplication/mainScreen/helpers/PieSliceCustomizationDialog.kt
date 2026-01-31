@@ -20,6 +20,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -39,22 +40,20 @@ import kotlin.random.Random
 @Composable
 fun SliceCustomizePopoverMovement(
     expanded: Boolean,
-    anchorOffsetPx: Offset,          // tap position in the same Box coordinate space (px)
-    containerSizePx: IntOffset,      // width/height of the anchor Box (px)
+    anchorOffsetPx: Offset,
+    containerSizePx: IntOffset,
     pie: Pie?,
     onClose: () -> Unit,
     onUpdatePie: (Pie) -> Unit,
 ) {
     if (pie == null) return
-
-    // Rough popover size for clamping (keeps it on-screen).
-    // You can tweak these to match your design.
+    // Sizes
     val popoverWidth = 280.dp
-    val popoverHeight = 220.dp
+    val popoverHeight = 350.dp
     val gap = 10.dp
 
     val density = LocalDensity.current
-    val (popoverWpx, popoverHpx, gapPx) = with(density) {
+    val (popoverWpx, popoverHpx, gapPx) = with(density) {//TODO()
         Triple(popoverWidth.toPx(), popoverHeight.toPx(), gap.toPx())
     }
 
@@ -89,11 +88,10 @@ fun SliceCustomizePopoverMovement(
         label = "popoverOffset"
     )
 
-    // Pretty enter/exit animation
+    // enter/exit animation
     val visibleState = remember { MutableTransitionState(false) }
     LaunchedEffect(expanded) { visibleState.targetState = expanded }
 
-    // Non-modal Popup: focusable=false => outside touches go through
     Popup(
         alignment = Alignment.TopStart,
         offset = animatedOffset,
@@ -134,7 +132,7 @@ fun SliceCustomizePopoverMovement(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                text = pie.label ?: "Customize slice",
+                                text = pie.label ?: "Customize movement",
                                 style = MaterialTheme.typography.titleMedium
                             )
                             val subtitle = pie.durationText ?: "Tap options below"
@@ -147,41 +145,71 @@ fun SliceCustomizePopoverMovement(
                     }
 
                     Divider()
-                    //val lat = pie.lat
-                    //val lng = pie.lng
-                    //val endLat = pie.lat
-                    //val endLng = pie.lng
-                    ////if(endLat != null && endLng != null){
-////
-                    ////}
-                    ////else
-                    //if (lat != null && lng != null) {
-//
-                    //    val markerPosition = LatLng(lat, lng)
-//
-                    //    val cameraPositionState = rememberCameraPositionState()
-//
-                    //    // 🔥 Move camera every time marker changes
-                    //    LaunchedEffect(markerPosition) {
-                    //        cameraPositionState.animate(
-                    //            update = com.google.android.gms.maps.CameraUpdateFactory
-                    //                .newLatLngZoom(markerPosition, 15f)
-                    //        )
-                    //    }
-//
-                    //    GoogleMap(
-                    //        modifier = Modifier
-                    //            .fillMaxWidth()
-                    //            .height(160.dp),
-                    //        cameraPositionState = cameraPositionState
-                    //    ) {
-                    //        Marker(
-                    //            state = MarkerState(position = LatLng(lat, lng)),
-                    //            title = pie.label
-                    //        )
-                    //    }
-                    //}
+
+                    // Google Maps
+                    val startLat = pie.lat
+                    val startLng = pie.lng
+                    val endLat = pie.endLat // Assumes Pie has these properties
+                    val endLng = pie.endLng
+
+                    if (startLat != null && startLng != null && endLat != null && endLng != null) {
+                        val startPos = LatLng(startLat, startLng)
+                        val endPos = LatLng(endLat, endLng)
+
+                        val cameraPositionState = rememberCameraPositionState()
+
+                        // Calculate bounds to show both start and end
+                        LaunchedEffect(startPos, endPos) {
+                            try {
+                                val bounds = com.google.android.gms.maps.model.LatLngBounds.builder()
+                                    .include(startPos)
+                                    .include(endPos)
+                                    .build()
+
+                                // Padding in pixels (e.g., 50) to keep markers away from edges
+                                cameraPositionState.move(
+                                    com.google.android.gms.maps.CameraUpdateFactory.newLatLngBounds(bounds, 100)
+                                )
+                            } catch (e: Exception) {
+                                // Fallback if points are identical or invalid
+                                cameraPositionState.move(
+                                    com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(startPos, 15f)
+                                )
+                            }
+                        }
+
+                        GoogleMap(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .clip(RoundedCornerShape(8.dp)), // Added clip for cleaner look
+                            cameraPositionState = cameraPositionState,
+                            uiSettings = com.google.maps.android.compose.MapUiSettings(
+                                zoomControlsEnabled = true,
+                                mapToolbarEnabled = false
+                            )
+                        ) {
+                            // Start Marker (Default Red)
+                            Marker(
+                                state = MarkerState(position = startPos),
+                                title = "Start",
+                                snippet = "Start Location"
+                            )
+
+                            // End Marker (Blue to distinguish)
+                            Marker(
+                                state = MarkerState(position = endPos),
+                                title = "End",
+                                snippet = "End Location",
+                                icon = com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(
+                                    com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_BLUE
+                                )
+                            )
+                        }
+                    }
+
                     Divider()
+
                     // Color chips
                     Text(
                         text = "Color",
@@ -219,7 +247,7 @@ fun SliceCustomizePopoverMovement(
                         ColorChip(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             selected = false,
-                            label = "🎲",
+                            label = "?",
                             onClick = {
                                 val rc = Color(
                                     Random.nextInt(40, 256),
@@ -243,22 +271,20 @@ fun SliceCustomizePopoverMovement(
 @Composable
 fun SliceCustomizePopover(
     expanded: Boolean,
-    anchorOffsetPx: Offset,          // tap position in the same Box coordinate space (px)
-    containerSizePx: IntOffset,      // width/height of the anchor Box (px)
+    anchorOffsetPx: Offset,
+    containerSizePx: IntOffset,
     pie: Pie?,
     onClose: () -> Unit,
     onUpdatePie: (Pie) -> Unit,
 ) {
     if (pie == null) return
-
-    // Rough popover size for clamping (keeps it on-screen).
-    // You can tweak these to match your design.
+    // Sizes
     val popoverWidth = 280.dp
-    val popoverHeight = 220.dp
+    val popoverHeight = 350.dp
     val gap = 10.dp
 
     val density = LocalDensity.current
-    val (popoverWpx, popoverHpx, gapPx) = with(density) {
+    val (popoverWpx, popoverHpx, gapPx) = with(density) {//TODO()
         Triple(popoverWidth.toPx(), popoverHeight.toPx(), gap.toPx())
     }
 
@@ -293,11 +319,10 @@ fun SliceCustomizePopover(
         label = "popoverOffset"
     )
 
-    // Pretty enter/exit animation
+    // enter/exit animation
     val visibleState = remember { MutableTransitionState(false) }
     LaunchedEffect(expanded) { visibleState.targetState = expanded }
 
-    // Non-modal Popup: focusable=false => outside touches go through
     Popup(
         alignment = Alignment.TopStart,
         offset = animatedOffset,
@@ -353,20 +378,14 @@ fun SliceCustomizePopover(
                     Divider()
                     val lat = pie.lat
                     val lng = pie.lng
-                    val endLat = pie.lat
-                    val endLng = pie.lng
-                    //if(endLat != null && endLng != null){
-//
-                    //}
-                    //else
                     if (lat != null && lng != null) {
 
                         val markerPosition = LatLng(lat, lng)
 
                         val cameraPositionState = rememberCameraPositionState()
 
-                        // 🔥 Move camera every time marker changes
-                        LaunchedEffect(markerPosition) {
+                        // Move camera every time marker changes
+                        LaunchedEffect(markerPosition) {4
                             cameraPositionState.animate(
                                 update = com.google.android.gms.maps.CameraUpdateFactory
                                     .newLatLngZoom(markerPosition, 15f)
