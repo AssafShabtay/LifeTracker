@@ -4,13 +4,21 @@ import android.app.DatePickerDialog
 import android.app.Dialog
 import android.os.Bundle
 import android.widget.DatePicker
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -29,7 +37,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,7 +49,12 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.DialogFragment
 import com.example.myapplication.ActivityDatabase
 import com.example.myapplication.mainScreen.helpers.ActivityData
+import com.example.myapplication.mainScreen.helpers.Pie
+import com.example.myapplication.mainScreen.helpers.PieChart
 import com.example.myapplication.mainScreen.helpers.PieChartViewModel
+import com.example.myapplication.mainScreen.helpers.TimelineItem
+import com.example.myapplication.mainScreen.helpers.pieDataFromTimeline
+import java.sql.Time
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -124,6 +140,7 @@ fun CalendarDateSelector(
                             } else {
                                 currentMonth--
                             }
+                            viewModel.loadDataForLastMonth(currentMonth, currentYear)
                         }) {
                             Icon(Icons.Default.ExpandLess, "Previous month",
                                 modifier = Modifier.rotate(-90f))
@@ -145,6 +162,7 @@ fun CalendarDateSelector(
                             } else {
                                 currentMonth++
                             }
+                            viewModel.loadDataForLastMonth(currentMonth, currentYear)
                         }) {
                             Icon(Icons.Default.ExpandMore, "Next month",
                                 modifier = Modifier.rotate(-90f))
@@ -212,13 +230,10 @@ fun CalendarGrid(
     val selectedYear = selectedCal.get(Calendar.YEAR)
 
     // Load activity data for all days in the month
-    val context = LocalContext.current
-    val database = remember { ActivityDatabase.getDatabase(context) }
-    val dao = remember { database.activityDao() }
-    var monthActivityData by remember { mutableStateOf<Map<Int, List<ActivityData>>>(emptyMap()) }
+    var monthActivityData by remember { mutableStateOf<Map<Int, List<TimelineItem>>>(emptyMap()) }
 
     LaunchedEffect(month, year) {
-        monthActivityData = viewModel.loadDataForDay(dao, month, year)
+        monthActivityData = viewModel.monthData
     }
 
     val weeks = mutableListOf<List<Int>>()
@@ -259,7 +274,8 @@ fun CalendarGrid(
                             isSelected = day == selectedDay &&
                                     month == selectedMonth &&
                                     year == selectedYear,
-                            activityData = monthActivityData[day]?.let { applySavedColors(context, it) },
+                            selectedDate = selectedDate,
+                            activityData = monthActivityData[day],
                             onClick = {
                                 val newDate = Calendar.getInstance().apply {
                                     set(Calendar.YEAR, year)
@@ -280,4 +296,82 @@ fun CalendarGrid(
             Spacer(modifier = Modifier.height(4.dp))
         }
     }
+
 }
+
+@Composable
+fun CalendarDay(
+    day: Int,
+    isSelected: Boolean,
+    selectedDate: Date,
+    activityData: List<TimelineItem>?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = day.toString(),
+            fontSize = 14.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Mini pie chart preview
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .border(
+                    width = if (isSelected) 2.dp else 0.5.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outlineVariant,
+                    shape = CircleShape
+                )
+        ) {
+            if (!activityData.isNullOrEmpty()) {
+                MiniPieChart(
+                    data = activityData,
+                    selectedDate = selectedDate,
+                    modifier = Modifier.fillMaxSize(),
+
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                )
+            }
+        }
+    }
+}
+@Composable
+fun MiniPieChart(data: List<TimelineItem>, selectedDate: Date, modifier: Modifier = Modifier) {
+
+    val pieData = remember(data) {
+        pieDataFromTimeline(data, selectedDate)
+    }
+
+    // 2. Use the same PieChart component from PieChartComposable
+    // We disable clicks and set a smaller stroke width for the "mini" look
+    PieChart(
+        modifier = modifier,
+        data = pieData,
+        onPieClick = { _, _ -> }, // Disable interaction in calendar
+        selectedScale = 1.0f,     // No scaling on "selection" for mini chart
+        spaceDegree = 1.0f,
+        style = Pie.Style.Stroke(width = 4.dp) // Much thinner line for the day view
+    )
+}
+
+
+
+

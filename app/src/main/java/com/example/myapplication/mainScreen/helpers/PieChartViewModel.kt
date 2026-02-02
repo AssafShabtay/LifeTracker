@@ -36,7 +36,7 @@ class PieChartViewModel(
             dayTimeline = getTimelineForRange(dao, start, end)
         }
     }
-    fun loadMonth(month: Int, year: Int) {
+    fun loadDataForLastMonth(month: Int, year: Int) {
         viewModelScope.launch {
             val newData = mutableMapOf<Int, List<TimelineItem>>()
             val cal = Calendar.getInstance()
