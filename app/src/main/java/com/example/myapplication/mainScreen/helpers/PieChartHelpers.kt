@@ -62,7 +62,7 @@ fun totalDurationMinutes(timeline: List<TimelineItem>, dayStart: Date, dayEnd: D
                     item.item.endTimeDate,
                     dayStart,
                     dayEnd,
-                    true
+
                 )
             is TimelineItem.Movement ->
                 durationMinutes(
@@ -70,10 +70,10 @@ fun totalDurationMinutes(timeline: List<TimelineItem>, dayStart: Date, dayEnd: D
                     item.item.endTimeDate,
                     dayStart,
                     dayEnd,
-                    true
+
                 )
             is TimelineItem.Remaining ->
-                durationMinutes(item.startTimeDate, item.endTimeDate, dayStart, dayEnd, true)
+                durationMinutes(item.startTimeDate, item.endTimeDate, dayStart, dayEnd)
         }
     }
 }
@@ -118,13 +118,13 @@ suspend fun getTimelineForRange(dao: ActivityDao, startOfDay: Date, endOfDay: Da
 
     return timeline
 }
-fun durationMinutes(start: Date?, end: Date?, startOfDay: Date, endOfDay: Date, durationOnlyDuringDay: Boolean = true): Int {
+fun durationMinutes(start: Date?, end: Date?, startOfDay: Date? = null, endOfDay: Date? = null): Int {
     // Return the duration of the activity in minutes
     if (start == null) return 0
 
     val actualEnd = end ?: Date()
     // if activity starts before 00:00, change the start time to 00:00
-    if(durationOnlyDuringDay) {
+    if (startOfDay != null && endOfDay != null) {
         if (start.time !in startOfDay.time..endOfDay.time) {
             return ((actualEnd.time - startOfDay.time)
                 .coerceAtLeast(0) / 1000 / 60).toInt()
@@ -150,24 +150,22 @@ fun pieDataFromTimeline(timeline: List<TimelineItem>,selectedDate: Date): List<P
             is TimelineItem.Still -> durationMinutes(
                 item.item.startTimeDate,
                 item.item.endTimeDate,
-                startOfDay,
-                endOfDay,
-                false
+                null,
+                null
             )
 
             is TimelineItem.Movement -> durationMinutes(
                 item.item.startTimeDate,
                 item.item.endTimeDate,
-                startOfDay,
-                endOfDay,
-                false
+                null,
+                null
             )
             is TimelineItem.Remaining -> durationMinutes(
                 item.startTimeDate,
                 item.endTimeDate,
-                startOfDay,
-                endOfDay,
-                false
+                null,
+                null
+
             )
         }
 

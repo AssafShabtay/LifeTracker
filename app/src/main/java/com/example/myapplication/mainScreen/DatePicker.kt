@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,6 +54,8 @@ import com.example.myapplication.mainScreen.helpers.Pie
 import com.example.myapplication.mainScreen.helpers.PieChart
 import com.example.myapplication.mainScreen.helpers.PieChartViewModel
 import com.example.myapplication.mainScreen.helpers.TimelineItem
+import com.example.myapplication.mainScreen.helpers.durationMinutes
+import com.example.myapplication.mainScreen.helpers.getDayRange
 import com.example.myapplication.mainScreen.helpers.pieDataFromTimeline
 import java.sql.Time
 import java.text.SimpleDateFormat
@@ -73,6 +76,12 @@ fun CalendarDateSelector(
     var currentMonth by remember { mutableIntStateOf(calendar.get(Calendar.MONTH)) }
     var currentYear by remember { mutableIntStateOf(calendar.get(Calendar.YEAR)) }
     var expandedCalendar by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentMonth, currentYear, expandedCalendar) {
+        if (expandedCalendar) {
+            viewModel.loadDataForLastMonth(currentMonth, currentYear)
+        }
+    }
 
     val dateFormat = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault())
     val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
@@ -230,11 +239,7 @@ fun CalendarGrid(
     val selectedYear = selectedCal.get(Calendar.YEAR)
 
     // Load activity data for all days in the month
-    var monthActivityData by remember { mutableStateOf<Map<Int, List<TimelineItem>>>(emptyMap()) }
-
-    LaunchedEffect(month, year) {
-        monthActivityData = viewModel.monthData
-    }
+    val monthActivityData = viewModel.monthData
 
     val weeks = mutableListOf<List<Int>>()
     var week = mutableListOf<Int>()
@@ -271,10 +276,12 @@ fun CalendarGrid(
                     } else {
                         CalendarDay(
                             day = day,
+                            month = month,
+                            year = year,
                             isSelected = day == selectedDay &&
                                     month == selectedMonth &&
                                     year == selectedYear,
-                            selectedDate = selectedDate,
+
                             activityData = monthActivityData[day],
                             onClick = {
                                 val newDate = Calendar.getInstance().apply {
@@ -302,8 +309,9 @@ fun CalendarGrid(
 @Composable
 fun CalendarDay(
     day: Int,
+    month: Int,
+    year: Int,
     isSelected: Boolean,
-    selectedDate: Date,
     activityData: List<TimelineItem>?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -337,12 +345,17 @@ fun CalendarDay(
                 )
         ) {
             if (!activityData.isNullOrEmpty()) {
+                val selectedCellDate = remember(day, month, year) {
+                    Calendar.getInstance().apply {
+                        set(year, month, day)
+                    }.time
+                }
                 MiniPieChart(
                     data = activityData,
-                    selectedDate = selectedDate,
+                    selectedCellDate = selectedCellDate,
                     modifier = Modifier.fillMaxSize(),
 
-                )
+                    )
             } else {
                 Box(
                     modifier = Modifier
@@ -354,24 +367,65 @@ fun CalendarDay(
     }
 }
 @Composable
-fun MiniPieChart(data: List<TimelineItem>, selectedDate: Date, modifier: Modifier = Modifier) {
+fun MiniPieChart(
+    data: List<TimelineItem>,
+    selectedCellDate: Date,
+    modifier: Modifier = Modifier
+) {
+    val (startOfDay, endOfDay) = getDayRange(selectedCellDate)
 
-    val pieData = remember(data) {
-        pieDataFromTimeline(data, selectedDate)
+    // Compute durations correctly
+    val durations = data.map { item ->
+        when (item) {
+            is TimelineItem.Still -> durationMinutes(
+                item.item.startTimeDate,
+                item.item.endTimeDate,
+                startOfDay,
+                endOfDay,
+            )
+
+            is TimelineItem.Movement -> durationMinutes(
+                item.item.startTimeDate,
+                item.item.endTimeDate,
+                startOfDay,
+                endOfDay,
+            )
+
+            is TimelineItem.Remaining -> durationMinutes(
+                item.startTimeDate,
+                item.endTimeDate,
+                startOfDay,
+                endOfDay,
+            )
+        }.toFloat()
     }
 
-    // 2. Use the same PieChart component from PieChartComposable
-    // We disable clicks and set a smaller stroke width for the "mini" look
-    PieChart(
-        modifier = modifier,
-        data = pieData,
-        onPieClick = { _, _ -> }, // Disable interaction in calendar
-        selectedScale = 1.0f,     // No scaling on "selection" for mini chart
-        spaceDegree = 1.0f,
-        style = Pie.Style.Stroke(width = 4.dp) // Much thinner line for the day view
-    )
+
+    val totalDuration = durations.sum()
+
+    Canvas(modifier = modifier) {
+        if (totalDuration == 0f) return@Canvas
+
+        var startAngle = -90f
+
+        data.zip(durations).forEach { (slot, duration) ->
+
+            val sweepAngle = (duration / totalDuration) * 360f
+
+            val color = when (slot) {
+                is TimelineItem.Still -> Color.Gray
+                is TimelineItem.Movement -> Color(0xFF4CAF50)
+                is TimelineItem.Remaining -> Color(0xFFE0E0E0)
+            }
+
+            drawArc(
+                color = color,
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = true
+            )
+
+            startAngle += sweepAngle
+        }
+    }
 }
-
-
-
-

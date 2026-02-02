@@ -43,10 +43,19 @@ class PieChartViewModel(
             cal.set(year, month, 1)
             val days = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
-            for (day in 1..days) {
-                cal.set(Calendar.DAY_OF_MONTH, day)
-                val (start, end) = getBounds(cal.time)
-                newData[day] = getTimelineForRange(dao, start, end)
+            (1..days).forEach { day ->
+                launch { // Launches a new coroutine for each day in parallel
+                    val dayCal = Calendar.getInstance().apply {
+                        set(year, month, day)
+                    }
+                    val (start, end) = getBounds(dayCal.time)
+                    val dayTimeline = getTimelineForRange(dao, start, end)
+
+                    // Update the map incrementally so UI updates day-by-day
+                    monthData = monthData.toMutableMap().apply {
+                        this[day] = dayTimeline
+                    }
+                }
             }
             monthData = newData
         }
