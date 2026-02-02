@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.DialogFragment
 import com.example.myapplication.ActivityDatabase
+import com.example.myapplication.mainScreen.helpers.ActivityData
+import com.example.myapplication.mainScreen.helpers.PieChartViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -45,13 +48,14 @@ import java.util.Locale
 fun CalendarDateSelector(
     selectedDate: Date,
     onDateSelected: (Date) -> Unit,
+    viewModel: PieChartViewModel,
     modifier: Modifier = Modifier
 ) {
     val calendar = Calendar.getInstance()
     calendar.time = selectedDate
 
-    var currentMonth by remember { mutableStateOf(calendar.get(Calendar.MONTH)) }
-    var currentYear by remember { mutableStateOf(calendar.get(Calendar.YEAR)) }
+    var currentMonth by remember { mutableIntStateOf(calendar.get(Calendar.MONTH)) }
+    var currentYear by remember { mutableIntStateOf(calendar.get(Calendar.YEAR)) }
     var expandedCalendar by remember { mutableStateOf(false) }
 
     val dateFormat = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault())
@@ -148,12 +152,13 @@ fun CalendarDateSelector(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-//TODO ADD OPTION TO START WEEK AT MONADAY
+
                     // Day of week headers
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
+                        //TODO add an option for the starting day of the wek
                         listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
                             Text(
                                 text = day,
@@ -176,7 +181,8 @@ fun CalendarDateSelector(
                         onDateSelected = { newDate ->
                             onDateSelected(newDate)
                             expandedCalendar = false
-                        }
+                        },
+                        viewModel,
                     )
                 }
             }
@@ -188,9 +194,9 @@ fun CalendarGrid(
     month: Int,
     year: Int,
     selectedDate: Date,
-    onDateSelected: (Date) -> Unit
+    onDateSelected: (Date) -> Unit,
+    viewModel: PieChartViewModel,
 ) {
-    // Calendar Setup
     val calendar = Calendar.getInstance()
     calendar.set(Calendar.YEAR, year)
     calendar.set(Calendar.MONTH, month)
@@ -199,30 +205,27 @@ fun CalendarGrid(
     val firstDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - 1
     val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
 
-    // Selected Date
     val selectedCal = Calendar.getInstance()
     selectedCal.time = selectedDate
     val selectedDay = selectedCal.get(Calendar.DAY_OF_MONTH)
     val selectedMonth = selectedCal.get(Calendar.MONTH)
     val selectedYear = selectedCal.get(Calendar.YEAR)
 
-    // Load all the activity data for the selected month
+    // Load activity data for all days in the month
     val context = LocalContext.current
-    val database = remember { ActivityDatabase.getDatabase(context.applicationContext) }
+    val database = remember { ActivityDatabase.getDatabase(context) }
     val dao = remember { database.activityDao() }
-    var monthActivityData by remember { mutableStateOf<Map<Int, List<ActivityTimeSlot>>>(emptyMap()) }
+    var monthActivityData by remember { mutableStateOf<Map<Int, List<ActivityData>>>(emptyMap()) }
 
     LaunchedEffect(month, year) {
-        monthActivityData = loadMonthActivityData(dao, month, year)
+        monthActivityData = viewModel.loadDataForDay(dao, month, year)
     }
 
     val weeks = mutableListOf<List<Int>>()
     var week = mutableListOf<Int>()
 
     // Padding before first day
-    repeat(firstDayOfWeek) {
-        week.add(0)
-    }
+    repeat(firstDayOfWeek) { week.add(0) }
 
     // Fill days
     for (day in 1..daysInMonth) {

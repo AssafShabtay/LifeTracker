@@ -47,17 +47,17 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 data class Pie(
-    val label: String? = null,
-    val data: Int,
-    val color: Color,
-    val lat: Double? = null,
-    val lng: Double? = null,
-    val endLat: Double? = null,
-    val endLng: Double? = null,
-    val durationText: String? = null,
-    val icon: ImageVector? = null,
-    val type: PieType,
-    val selectedColor: Color = color,
+    override val label: String? = null,
+    override val data: Int,
+    override val color: Color,
+    override val lat: Double? = null,
+    override val lng: Double? = null,
+    override val endLat: Double? = null,
+    override val endLng: Double? = null,
+    override val durationText: String? = null,
+    override val icon: ImageVector? = null,
+    override val type: PieType,
+    override val selectedColor: Color = color,
     val selectedScale: Float? = null,
     val selectedPaddingDegree: Float? = null,
     val selected: Boolean = false,
@@ -69,7 +69,7 @@ data class Pie(
     val scaleAnimExitSpec: AnimationSpec<Float>? = null,
     val spaceDegreeAnimExitSpec: AnimationSpec<Float>? = null,
     val style: Style        ? = null
-) {
+) : ActivityData {
     sealed class Style {
         data object Fill : Style()
         data class Stroke(val width: Dp = 42.dp) : Style()
