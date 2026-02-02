@@ -33,23 +33,23 @@ private const val TOTAL_MINUTES = 1440.0
 private const val FULL_CIRCLE_DEG = 360.0
 private const val MIN_ANGLE_DEG = 25.0
 
-fun todayRange(): Pair<Date, Date> {
-    // Get the current date and time and set the time to midnight
+fun getDayRange(date: Date = Date()): Pair<Date, Date> {
     val cal = Calendar.getInstance()
+    cal.time = date
 
     cal.set(Calendar.HOUR_OF_DAY, 0)
     cal.set(Calendar.MINUTE, 0)
     cal.set(Calendar.SECOND, 0)
     cal.set(Calendar.MILLISECOND, 0)
-
     val start = cal.time
 
     cal.set(Calendar.HOUR_OF_DAY, 23)
     cal.set(Calendar.MINUTE, 59)
     cal.set(Calendar.SECOND, 59)
     cal.set(Calendar.MILLISECOND, 999)
+    val end = cal.time
 
-    return start to cal.time
+    return start to end
 }
 
 fun totalDurationMinutes(timeline: List<TimelineItem>): Int {
@@ -67,9 +67,9 @@ fun totalDurationMinutes(timeline: List<TimelineItem>): Int {
     }
 }
 
-suspend fun getTodayTimeline(dao: ActivityDao): List<TimelineItem> {
+suspend fun getTimelineForDay(dao: ActivityDao, date: Date): List<TimelineItem> {
     //Get the data from today
-    val (start, end) = todayRange()
+    val (start, end) = getDayRange(date)
 
     val still = dao.getStillForDay(start, end)
         .map{TimelineItem.Still(it)}
@@ -112,7 +112,7 @@ fun durationMinutes(start: Date?, end: Date?): Int {
     // Return the duration of the activity in minutes
     if (start == null) return 0
 
-    val (startOfDay, endOfDay) = todayRange()
+    val (startOfDay, endOfDay) = getDayRange(start)
     val actualEnd = end ?: Date()
 
     if (start.time !in startOfDay.time..endOfDay.time) {
