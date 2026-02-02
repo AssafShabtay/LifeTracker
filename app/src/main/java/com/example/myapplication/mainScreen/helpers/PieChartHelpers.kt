@@ -34,6 +34,7 @@ private const val FULL_CIRCLE_DEG = 360.0
 private const val MIN_ANGLE_DEG = 25.0
 
 fun getDayRange(date: Date = Date()): Pair<Date, Date> {
+    // returns  the range of a specific date
     val cal = Calendar.getInstance()
     cal.time = date
 
@@ -52,29 +53,38 @@ fun getDayRange(date: Date = Date()): Pair<Date, Date> {
     return start to end
 }
 
-fun totalDurationMinutes(timeline: List<TimelineItem>): Int {
+fun totalDurationMinutes(timeline: List<TimelineItem>, dayStart: Date, dayEnd: Date): Int {
     return timeline.sumOf { item ->
         when (item) {
             is TimelineItem.Still ->
-                durationMinutes(item.item.startTimeDate, item.item.endTimeDate)
-
+                durationMinutes(
+                    item.item.startTimeDate,
+                    item.item.endTimeDate,
+                    dayStart,
+                    dayEnd,
+                    true
+                )
             is TimelineItem.Movement ->
-                durationMinutes(item.item.startTimeDate, item.item.endTimeDate)
-
+                durationMinutes(
+                    item.item.startTimeDate,
+                    item.item.endTimeDate,
+                    dayStart,
+                    dayEnd,
+                    true
+                )
             is TimelineItem.Remaining ->
-                durationMinutes(item.startTimeDate, item.endTimeDate)
+                durationMinutes(item.startTimeDate, item.endTimeDate, dayStart, dayEnd, true)
         }
     }
 }
 
-suspend fun getTimelineForDay(dao: ActivityDao, date: Date): List<TimelineItem> {
+suspend fun getTimelineForRange(dao: ActivityDao, startOfDay: Date, endOfDay: Date): List<TimelineItem> {
     //Get the data from today
-    val (start, end) = getDayRange(date)
 
-    val still = dao.getStillForDay(start, end)
+    val still = dao.getStillForRange(startOfDay, endOfDay)
         .map{TimelineItem.Still(it)}
 
-    val movement = dao.getMovementForDay(start, end)
+    val movement = dao.getMovementForRange(startOfDay, endOfDay)
         .map{TimelineItem.Movement(it)}
 
     val timeline = (still + movement)
@@ -87,7 +97,7 @@ suspend fun getTimelineForDay(dao: ActivityDao, date: Date): List<TimelineItem> 
         }
 
 
-        if (totalDurationMinutes(timeline)<1440){
+        if (totalDurationMinutes(timeline, startOfDay, endOfDay)<1440){
 
             val lastEndTime = timeline
                 .lastOrNull { it is TimelineItem.Still || it is TimelineItem.Movement }
@@ -97,57 +107,67 @@ suspend fun getTimelineForDay(dao: ActivityDao, date: Date): List<TimelineItem> 
                         is TimelineItem.Movement -> it.item.endTimeDate
                         else -> null
                     }
-                } ?: start
+                } ?: startOfDay
 
             val customSlice = TimelineItem.Remaining(
             startTimeDate = lastEndTime,
-            endTimeDate = end,
+            endTimeDate = endOfDay,
         )
         return timeline + customSlice
 }
 
     return timeline
 }
-fun durationMinutes(start: Date?, end: Date?): Int {
+fun durationMinutes(start: Date?, end: Date?, startOfDay: Date, endOfDay: Date, durationOnlyDuringDay: Boolean = true): Int {
     // Return the duration of the activity in minutes
     if (start == null) return 0
 
-    val (startOfDay, endOfDay) = getDayRange(start)
     val actualEnd = end ?: Date()
-
-    if (start.time !in startOfDay.time..endOfDay.time) {
-        return ((actualEnd.time - startOfDay.time)
-            .coerceAtLeast(0) / 1000 / 60).toInt()
+    // if activity starts before 00:00, change the start time to 00:00
+    if(durationOnlyDuringDay) {
+        if (start.time !in startOfDay.time..endOfDay.time) {
+            return ((actualEnd.time - startOfDay.time)
+                .coerceAtLeast(0) / 1000 / 60).toInt()
+        }
+        // if activity ends after 00:00, change the end time to 00:00
+        if (actualEnd.time !in startOfDay.time..endOfDay.time) {
+            return ((endOfDay.time - start.time)
+                .coerceAtLeast(0) / 1000 / 60).toInt()
+        }
     }
-
-    if (actualEnd.time !in startOfDay.time..endOfDay.time) {
-        return ((endOfDay.time - start.time)
-            .coerceAtLeast(0) / 1000 / 60).toInt()
-    }
-
     return ((actualEnd.time - start.time)
         .coerceAtLeast(0) / 1000 / 60).toInt()
 }
 
-fun pieDataFromTimeline(timeline: List<TimelineItem>): List<Pie> {
+fun pieDataFromTimeline(timeline: List<TimelineItem>,selectedDate: Date): List<Pie> {
     //Converts the timeline into pie data
     //TODO instead of rebuilding the data each time, we can just update the pie chart
     //TODO ADD COLORS
+    val (startOfDay, endOfDay) = getDayRange(selectedDate)
     return normalizePieByAngle(timeline.mapIndexed { index, item ->
 
         val duration = when (item) {
             is TimelineItem.Still -> durationMinutes(
                 item.item.startTimeDate,
-                item.item.endTimeDate
+                item.item.endTimeDate,
+                startOfDay,
+                endOfDay,
+                false
             )
 
             is TimelineItem.Movement -> durationMinutes(
                 item.item.startTimeDate,
-                item.item.endTimeDate
+                item.item.endTimeDate,
+                startOfDay,
+                endOfDay,
+                false
             )
             is TimelineItem.Remaining -> durationMinutes(
                 item.startTimeDate,
-                item.endTimeDate
+                item.endTimeDate,
+                startOfDay,
+                endOfDay,
+                false
             )
         }
 

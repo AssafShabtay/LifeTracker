@@ -24,9 +24,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.helpers.InsertExampleDataButton
 import com.example.myapplication.helpers.insertExampleData
+import com.example.myapplication.mainScreen.CalendarDateSelector
 import com.example.myapplication.mainScreen.PieChartComposable
+import com.example.myapplication.mainScreen.helpers.PieChartViewModel
 
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import ir.ehsannarmani.compose_charts.PieChart
@@ -44,6 +49,13 @@ class MainActivity : ComponentActivity() {
                     .getDatabase(applicationContext)
                     .activityDao()
 
+                val viewModel: PieChartViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return PieChartViewModel(dao) as T
+                        }
+                    }
+                )
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(
                         modifier = Modifier
@@ -51,8 +63,16 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+
                         InsertExampleDataButton(dao)
-                        PieChartComposable(dao)
+                        CalendarDateSelector(
+                            selectedDate = viewModel.selectedDate,
+                            onDateSelected = { newDate ->
+                                viewModel.loadDataForDay(newDate)
+                            },
+                            viewModel
+                        )
+                        PieChartComposable(viewModel)
                     }
                 }
             }

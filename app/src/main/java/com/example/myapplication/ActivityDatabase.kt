@@ -117,14 +117,14 @@ interface ActivityDao {
     WHERE (startTimeDate BETWEEN :start AND :end)
        OR (endTimeDate BETWEEN :start AND :end)
 """)
-    suspend fun getStillForDay(start: Date, end: Date): List<StillLocation>
+    suspend fun getStillForRange(start: Date, end: Date): List<StillLocation>
 
     @Query("""
     SELECT * FROM movement_activities
     WHERE (startTimeDate BETWEEN :start AND :end)
        OR (endTimeDate BETWEEN :start AND :end)
 """)
-    suspend fun getMovementForDay(start: Date, end: Date): List<MovementActivity>
+    suspend fun getMovementForRange(start: Date, end: Date): List<MovementActivity>
 
     @Transaction
     suspend fun replaceStillWithMovement(id: Long, movement: MovementActivity) {

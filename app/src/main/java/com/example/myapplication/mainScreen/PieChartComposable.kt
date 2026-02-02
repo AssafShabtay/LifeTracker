@@ -23,7 +23,6 @@
     import androidx.compose.ui.graphics.Color
     import androidx.compose.ui.unit.dp
     import com.example.myapplication.mainScreen.helpers.PieChartViewModel
-    import com.example.myapplication.mainScreen.helpers.getTodayTimeline
     import com.example.myapplication.mainScreen.helpers.pieDataFromTimeline
     import androidx.compose.foundation.layout.Box
     import androidx.compose.runtime.remember
@@ -46,24 +45,19 @@
 
     @Composable
     fun PieChartComposable(
-        dao: ActivityDao,
+        viewModel: PieChartViewModel,
         modifier: Modifier = Modifier.size(220.dp)
-    ) {
-        val viewModel: PieChartViewModel = viewModel(
-            factory = object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return PieChartViewModel(dao) as T
-                }
-            }
-        )
 
-        val timeline = viewModel.timeline
+    ) {
+
+
+        val dayTimeline = viewModel.dayTimeline
 
         var stillPopover by remember { mutableStateOf<SlicePopoverState?>(null) }
         var movementPopover by remember { mutableStateOf<SlicePopoverState?>(null) }
 
-        var pieData by remember(timeline) {
-            mutableStateOf(pieDataFromTimeline(timeline))
+        var pieData by remember(dayTimeline) {
+            mutableStateOf(pieDataFromTimeline(dayTimeline, viewModel.selectedDate))
         }
 
         val containerSizePx = remember(maxWidth, maxHeight) {
