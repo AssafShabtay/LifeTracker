@@ -43,7 +43,7 @@ class PieChartViewModel(
             cal.set(year, month, 1)
             val days = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
-            (1..days).forEach { day ->
+            (1..days).forEach { day -> //TODO CHECK THIS OUT
                 launch { // Launches a new coroutine for each day in parallel
                     val dayCal = Calendar.getInstance().apply {
                         set(year, month, day)

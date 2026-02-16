@@ -1,11 +1,20 @@
 package com.example.myapplication
 
+import android.Manifest
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.location.Location
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresPermission
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -54,6 +63,7 @@ class LocationService : Service() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         dao = ActivityDatabase.getDatabase(applicationContext).activityDao()
         Log.d(TAG, "Service created")
+        createNotificationChannel()
 
     }
     override fun onDestroy() {
@@ -103,12 +113,7 @@ class LocationService : Service() {
             }
             currentActivity = DetectedActivity.UNKNOWN
         }
-        val activityName = getActivityName(activityType)
         updateNotification()
-    }
-
-    private fun updateNotification() {
-        TODO("Not yet implemented")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -137,15 +142,73 @@ class LocationService : Service() {
             }
         }
 
+    //----------------------------------- Notifications ------------------------------------------
     private fun startForeground() {
         val notification = buildNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to start foreground service (notification permission?)", t)
+        }
     }
-    private fun buildNotification(): Notification {
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-        TODO()
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Location Tracking",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Location Tracking"
+            setShowBadge(false)
+        }
+
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
     }
-    // End and start activities
+
+    private fun buildNotification(): Notification {
+        val activityLabel = when (currentActivity) {
+            DetectedActivity.UNKNOWN -> "Unknown"
+            else -> getActivityName(currentActivity)
+        }
+
+        val contentText = if (currentTrackingId != null && currentActivity != DetectedActivity.UNKNOWN) {
+            "Recording: $activityLabel"
+        } else {
+            "Idle • Waiting for activity updates…"
+        }
+
+        val openAppIntent = Intent(this, MainActivity::class.java)
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val pendingIntent = PendingIntent.getActivity(this, 0, openAppIntent, flags)
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Tracking")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    private fun updateNotification() {
+        try {
+            NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, buildNotification())
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to update notification", t)
+        }
+    }
+
+    // ----------------------------------- End and start activities -----------------------------------
     private suspend fun startStillTracking(){
         currentLocation = getLocationOnce()
         val stillLocation = StillLocation(
@@ -189,7 +252,7 @@ class LocationService : Service() {
                 endLongitude = currentLocation!!.longitude
             )
 
-            if (resolvedActivityType  == "still") {
+            if (resolvedActivityType.equals("Still", ignoreCase = true))  {
                 try {
                     dao.endStillLocation(id, endTime)
                 }
