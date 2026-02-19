@@ -274,6 +274,20 @@ fun CalendarGrid(
                     if (day == 0) {
                         Spacer(modifier = Modifier.weight(1f))
                     } else {
+                        val isFuture = remember(day, month, year) {
+                            val cellDate = Calendar.getInstance().apply {
+                                set(year, month, day, 0, 0, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            val comparisonDate = Calendar.getInstance().apply {
+                                set(Calendar.HOUR_OF_DAY, 0)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            cellDate.after(comparisonDate)
+                        }
+
                         CalendarDay(
                             day = day,
                             month = month,
@@ -281,20 +295,23 @@ fun CalendarGrid(
                             isSelected = day == selectedDay &&
                                     month == selectedMonth &&
                                     year == selectedYear,
-
+                            isFuture = isFuture,
                             activityData = monthActivityData[day],
                             onClick = {
-                                val newDate = Calendar.getInstance().apply {
-                                    set(Calendar.YEAR, year)
-                                    set(Calendar.MONTH, month)
-                                    set(Calendar.DAY_OF_MONTH, day)
-                                    set(Calendar.HOUR_OF_DAY, 0)
-                                    set(Calendar.MINUTE, 0)
-                                    set(Calendar.SECOND, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }.time
-                                onDateSelected(newDate)
+                                if(!isFuture) {
+                                    val newDate = Calendar.getInstance().apply {
+                                        set(Calendar.YEAR, year)
+                                        set(Calendar.MONTH, month)
+                                        set(Calendar.DAY_OF_MONTH, day)
+                                        set(Calendar.HOUR_OF_DAY, 0)
+                                        set(Calendar.MINUTE, 0)
+                                        set(Calendar.SECOND, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                    }.time
+                                    onDateSelected(newDate)
+                                }
                             },
+
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -312,13 +329,23 @@ fun CalendarDay(
     month: Int,
     year: Int,
     isSelected: Boolean,
+    isFuture: Boolean,
     activityData: List<TimelineItem>?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+
+    val contentAlpha = if (isFuture) 0.3f else 1f
+    val textColor = when {
+        isFuture -> MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+        isSelected -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
     Column(
         modifier = modifier
-            .clickable(onClick = onClick)
+            // Disable click if it's a future date
+            .then(if (!isFuture) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -326,8 +353,7 @@ fun CalendarDay(
             text = day.toString(),
             fontSize = 14.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurface
+            color = textColor
         )
 
         Spacer(modifier = Modifier.height(2.dp))
@@ -344,7 +370,7 @@ fun CalendarDay(
                     shape = CircleShape
                 )
         ) {
-            if (!activityData.isNullOrEmpty()) {
+            if (!isFuture && !activityData.isNullOrEmpty()) {
                 val selectedCellDate = remember(day, month, year) {
                     Calendar.getInstance().apply {
                         set(year, month, day)

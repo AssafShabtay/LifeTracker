@@ -1,5 +1,6 @@
 package com.example.myapplication
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,7 +12,9 @@ import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -60,9 +63,7 @@ class LocationService : Service() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         dao = ActivityDatabase.getDatabase(applicationContext).activityDao()
         Log.d(TAG, "Service created")
-        Logger.saveLog(applicationContext,
-            "Service Created"
-        )
+        createNotificationChannel()
 
     }
     override fun onDestroy() {
@@ -72,9 +73,6 @@ class LocationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground()
         if (intent?.action == ActivityTransitionReceiver.ACTION_ACTIVITY_UPDATE) {
-            Logger.saveLog(applicationContext,
-                "OnStartCommand"
-            )
             val activityType = intent.getIntExtra(ActivityTransitionReceiver.EXTRA_ACTIVITY_TYPE, DetectedActivity.UNKNOWN)
             val transitionType = intent.getIntExtra(ActivityTransitionReceiver.EXTRA_TRANSITION_TYPE, -1)
             serviceScope.launch {
@@ -87,9 +85,7 @@ class LocationService : Service() {
     }
     // updates current Activity and then start and DB record if it's enter, otherwise closes db activity
     private suspend fun handleActivityUpdate(activityType: Int, transitionType: Int) {
-        Logger.saveLog(applicationContext,
-            "HANDLEACTIVITYUPDATE"
-        )
+
         val enteringActivity = transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER
         if (activityType == DetectedActivity.UNKNOWN) {
             Log.d(TAG, "Ignoring unknown activity update (raw=$activityType)")
@@ -117,12 +113,7 @@ class LocationService : Service() {
             }
             currentActivity = DetectedActivity.UNKNOWN
         }
-        val activityName = getActivityName(activityType)
         updateNotification()
-    }
-
-    private fun updateNotification() {
-        TODO("Not yet implemented")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -151,59 +142,73 @@ class LocationService : Service() {
             }
         }
 
+    //----------------------------------- Notifications ------------------------------------------
     private fun startForeground() {
         val notification = buildNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to start foreground service (notification permission?)", t)
+        }
     }
-//TODO REVIEW NOTIFICAITONS
-
-    private fun buildNotification(): Notification {
-        val openAppIntent = Intent(this, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-
-        val openAppPendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val notificationText = when (currentActivity) {
-            DetectedActivity.STILL -> "Still"
-            DetectedActivity.WALKING -> "Walking"
-            else -> {
-                getActivityName(currentActivity)
-            }
-        }//todo add notificaiton text
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("Activity tracking")
-            .setContentText(notificationText)
-            .setContentIntent(openAppPendingIntent)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .build()
-    }
-
-    private fun ensureNotificationChannel() {
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
 
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Activity tracking",
+            "Location Tracking",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Shows the current activity being tracked"
+            description = "Location Tracking"
             setShowBadge(false)
-            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
         }
 
-        nm.createNotificationChannel(channel)
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
     }
-    // End and start activities
+
+    private fun buildNotification(): Notification {
+        val activityLabel = when (currentActivity) {
+            DetectedActivity.UNKNOWN -> "Unknown"
+            else -> getActivityName(currentActivity)
+        }
+
+        val contentText = if (currentTrackingId != null && currentActivity != DetectedActivity.UNKNOWN) {
+            "Recording: $activityLabel"
+        } else {
+            "Idle • Waiting for activity updates…"
+        }
+
+        val openAppIntent = Intent(this, MainActivity::class.java)
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val pendingIntent = PendingIntent.getActivity(this, 0, openAppIntent, flags)
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Tracking")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    private fun updateNotification() {
+        try {
+            NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, buildNotification())
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to update notification", t)
+        }
+    }
+
+    // ----------------------------------- End and start activities -----------------------------------
     private suspend fun startStillTracking(){
         currentLocation = getLocationOnce()
         val stillLocation = StillLocation(
@@ -247,7 +252,7 @@ class LocationService : Service() {
                 endLongitude = currentLocation!!.longitude
             )
 
-            if (resolvedActivityType  == "still") {
+            if (resolvedActivityType.equals("Still", ignoreCase = true))  {
                 try {
                     dao.endStillLocation(id, endTime)
                 }

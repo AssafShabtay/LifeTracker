@@ -58,6 +58,8 @@ android {
 }
 
 dependencies {
+    implementation("androidx.fragment:fragment-ktx:1.7.1")
+
     implementation(libs.androidx.compose.material.icons.extended) //TODO use R8 / ProGuard to remove unused icons https://developer.android.com/reference/kotlin/androidx/compose/material/icons/Icons.AutoMirrored
     val mapsComposeVersion = "4.4.1"
     implementation("com.google.maps.android:maps-compose:$mapsComposeVersion")
