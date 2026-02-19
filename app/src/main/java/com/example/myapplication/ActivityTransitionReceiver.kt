@@ -24,6 +24,9 @@
         override fun onReceive(context: Context, intent: Intent) {
             val result = ActivityTransitionResult.extractResult(intent) ?: return
             handleActivityTransitions(context, result)
+            Logger.saveLog(context,
+                "OnReiceve"
+            )
         }
 
         private fun handleActivityTransitions(context: Context, result: ActivityTransitionResult) {
