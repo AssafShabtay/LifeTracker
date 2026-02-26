@@ -2,6 +2,7 @@ package com.example.myapplication
 
 import android.Manifest
 import android.app.AlertDialog
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -13,6 +14,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,11 +55,15 @@ import com.example.myapplication.mainScreen.PieChartComposable
 import com.example.myapplication.mainScreen.helpers.PieChartViewModel
 
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.ActivityTransition
+import com.google.android.gms.location.ActivityTransitionRequest
+import com.google.android.gms.location.DetectedActivity
 import ir.ehsannarmani.compose_charts.PieChart
 import ir.ehsannarmani.compose_charts.models.Pie
 
 
-class MainActivity : ComponentActivity() {
+class                                                                                                               MainActivity : ComponentActivity() {
 
 
     //-----------------------------Permissions----------------------------
@@ -160,7 +166,52 @@ class MainActivity : ComponentActivity() {
         requiredPermissions.any { isPermanentlyDenied(it) }
 
 
+    //Request activity receiver to start
+    private fun requestTransitions() {
+        if (!hasAllPermissions()) {
+            Log.w("ActivityRecognition", "Aborting requestTransitions: Permissions not fully granted.")
+            return
+        }
+        val transitions = listOf(
+            DetectedActivity.STILL,
+            DetectedActivity.WALKING,
+            DetectedActivity.RUNNING,
+            DetectedActivity.IN_VEHICLE,
+            DetectedActivity.ON_BICYCLE,
+            DetectedActivity.ON_FOOT
+        ).flatMap { type ->
+            listOf(
+                ActivityTransition.Builder()
+                    .setActivityType(type)
+                    .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                    .build(),
+                ActivityTransition.Builder()
+                    .setActivityType(type)
+                    .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
+                    .build()
+            )
+        }
 
+        val request = ActivityTransitionRequest(transitions)
+        val intent = Intent(this, ActivityTransitionReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        try {
+            ActivityRecognition.getClient(this)
+                .requestActivityTransitionUpdates(request, pendingIntent)
+                .addOnFailureListener { e ->
+                    Log.e("ActivityRecognition", "Registration failed.", e)
+                }
+        } catch (e: SecurityException) {
+            Log.e("ActivityRecognition", "SecurityException: Missing permission for transitions", e)
+        }
+
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
 
 
@@ -178,8 +229,22 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     if (!hasPerms) requestPermissions()
                 }
+                LaunchedEffect(hasPerms) {
+                    if (hasPerms) {
+                        // runs when permissions are fully granted
+                        requestTransitions()
 
-                // Re-check when coming back from Settings / resume
+                        // start the service to show the Idle notification
+                        val intent = Intent(this@MainActivity, LocationService::class.java)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(intent)
+                        } else {
+                            startService(intent)
+                        }
+                    }
+                }
+
+                // Re check when coming back from settings
                 DisposableEffect(Unit) {//TODO CHECK WHATS THAT MEANS
                     val observer = LifecycleEventObserver { _, event ->
                         if (event == Lifecycle.Event.ON_RESUME) {
